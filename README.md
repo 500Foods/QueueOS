@@ -57,7 +57,7 @@ The project is in its early stages. Architectural documentation and design discu
 
 ## License
 
-See [LICENSE](LICENSE) for licensing information.
+See [LICENSE.md](LICENSE.md) for licensing information.
 
 
 ## Additional Notes

@@ -1,562 +1,511 @@
-# QueueOS Applications
+# QueueOS Application Binary Interface (ABI)
 
 ## 1. Purpose
 
-This document describes the application model used by QueueOS.
+This document describes the Application Binary Interface (ABI) for QueueOS.
 
-Applications are the primary means by which users extend the functionality of the operating system. They should be independently installable, identifiable, updateable, and removable without requiring changes to the core OS.
+The ABI defines the contract between applications and the operating system. It establishes how applications access OS functionality, submit work, receive results, and interact with system services.
 
-QueueOS is designed around a queue-centric execution model. Applications interact with OS functionality through the interfaces and services provided by the operating system, rather than depending on unrestricted access to internal OS components.
+A central objective is to maintain **one stable application-facing ABI across all supported CPU architectures**.
 
-The application model must integrate with:
+The ABI should allow an application to be developed against QueueOS without requiring its author to implement architecture-specific versions of ordinary OS interactions.
 
-- The QueueOS execution and queue infrastructure.
-- The OS Database and storage architecture.
-- The Features and Rights authorization model.
-- The architecture-independent application ABI.
-- The installation, update, and removal lifecycle.
+The internal implementation may differ between architectures, but the externally visible contract must remain consistent.
 
-The precise package format and installation mechanisms remain open design questions.
+This document describes the intended ABI architecture. Exact binary layouts, calling conventions, executable formats, and versioning rules remain to be specified.
 
-## 2. Application Design Principles
+## 2. Design Principles
 
-The application architecture should follow these principles:
+The ABI should follow these principles:
 
-- **Independent installation:** Applications can be installed and removed without rebuilding the OS.
-- **Explicit identity:** Every installed application has a stable identity.
-- **Declared functionality:** Applications describe the Features they provide.
-- **Explicit authorization:** Applications declare the Rights they request; the OS controls which Rights are granted.
-- **ABI consistency:** Applications use the stable QueueOS application ABI.
-- **Architecture independence:** Application interfaces should not unnecessarily depend on a particular CPU architecture.
-- **Isolation:** Applications should not gain unrestricted access to other applications or OS internals.
-- **Managed resources:** Application data, executable content, and metadata have defined ownership and lifecycles.
-- **Controlled updates:** Updates should preserve application identity and must not silently expand authorization.
-- **Minimal installation overhead:** The package and installation model should avoid unnecessary duplication and processing.
+- **Architecture independence:** The application-facing contract remains consistent across supported CPU architectures.
+- **Queue-centric interaction:** Queues are the primary mechanism for applications to interact with OS services.
+- **Stable contracts:** Applications should not depend on internal OS implementation details.
+- **Minimal overhead:** ABI operations should avoid unnecessary copying, serialization, context switching, and intermediate layers.
+- **Explicit data representation:** Structures and values crossing the ABI boundary must have well-defined representations.
+- **Controlled access:** Operations are subject to the application's granted Rights.
+- **Version compatibility:** The OS must be able to identify and handle ABI compatibility requirements.
+- **Extensibility:** The ABI should be capable of evolving without unnecessarily breaking existing applications.
+- **Language neutrality:** The ABI should not require applications to use one particular programming language.
 
-## 3. Application Identity
+## 3. ABI Scope
 
-Each application must have a unique identity within QueueOS.
+The ABI defines the application-facing contract for interaction with QueueOS.
 
-The identity should remain stable across application updates and should not depend on the application's display name, installation location, or current version.
+Its scope includes:
 
-Application identity will be used for:
+- Application startup and initialization.
+- Queue creation, access, and submission.
+- Operation completion and result retrieval.
+- Event delivery.
+- Memory and buffer exchange.
+- Access to OS services.
+- Error reporting.
+- Application lifecycle interactions.
+- Authorization-related responses.
+- Compatibility and version negotiation.
 
-- Installation records.
-- Application metadata.
-- Authorization and granted Rights.
-- Application-owned data.
-- Queue access and service interactions.
-- Update management.
-- Audit records.
-- Uninstallation.
+The ABI does not necessarily define the internal implementation of these facilities.
 
-The exact identity format has not yet been established.
+For example, it may define how an application submits a storage request without specifying how the storage service accesses physical blocks or how the database engine manages its internal structures.
 
-A reverse-domain identifier is one possible convention, but the canonical format should be selected independently of any particular package manager or distribution mechanism.
+Those implementation details belong to the relevant OS components.
 
-An application may also have a human-readable name, publisher information, description, and icon. These are presentation and discovery attributes, not substitutes for its stable identity.
+## 4. One ABI Across Architectures
 
-## 4. Application Metadata
+QueueOS is intended to support multiple CPU architectures without maintaining a separate application interface for each one.
 
-Applications need a machine-readable description of their identity, requirements, functionality, and authorization requests.
+The ABI must therefore avoid exposing architecture-specific assumptions unnecessarily.
 
-The metadata should provide enough information for QueueOS to install, identify, authorize, execute, update, and remove an application.
+This includes avoiding implicit dependence on:
 
-Candidate metadata fields include:
+- CPU register layouts.
+- Native pointer sizes.
+- Compiler-specific structure packing.
+- Architecture-specific calling conventions.
+- Native integer widths.
+- Endianness.
+- Unspecified alignment behaviour.
 
-| Field | Purpose |
+Where the ABI requires binary structures, their sizes, field offsets, alignment, and interpretation must be explicitly defined.
+
+Native CPU details may be used internally by an implementation, but they must not accidentally become part of the application-facing contract.
+
+### 4.1 Internal architecture-specific implementations
+
+The ABI does not require identical internal implementations on every architecture.
+
+An implementation may use architecture-specific instructions, optimized memory operations, or different low-level mechanisms.
+
+The requirement is that applications observe the same defined behaviour.
+
+This allows QueueOS to optimize for available hardware without fragmenting its application ecosystem.
+
+### 4.2 Native executable code
+
+A native application executable will necessarily contain machine-specific instructions.
+
+Architecture independence of the ABI does not mean that one compiled native binary must run on every CPU architecture.
+
+It means that an application targeting a supported architecture uses the same OS interface and behavioural contract as an application targeting another supported architecture.
+
+Architecture-independent executable environments may provide additional portability, but they are a separate concern.
+
+## 5. Queue Interface
+
+The queue interface is the central part of the application ABI.
+
+Applications submit work through queues rather than relying on a large collection of unrelated service-specific entry mechanisms.
+
+The ABI should provide consistent operations for:
+
+- Accessing an authorized queue.
+- Submitting work.
+- Receiving completion information.
+- Retrieving operation results.
+- Waiting for work or completion where appropriate.
+- Cancelling operations where supported.
+- Receiving events.
+- Releasing queue resources.
+
+The exact queue representation is not yet established.
+
+The ABI should describe queue behaviour and the application-visible contract without requiring queues to use a particular internal data structure.
+
+### 5.1 Service operations
+
+Individual OS services define the operations available through their interfaces.
+
+For example, a storage service may support read, write, and object-management operations, while a networking service exposes connection and communication operations.
+
+The queue infrastructure provides common submission and completion mechanisms.
+
+Service-specific operation definitions describe the actual work being requested.
+
+This separation should allow new services and operations to be introduced without redesigning the fundamental queue interface.
+
+### 5.2 Request representation
+
+Requests need a defined representation that applications and services can interpret consistently.
+
+The ABI must eventually specify:
+
+- Operation identification.
+- Request metadata.
+- Payload representation.
+- Request identity or correlation.
+- Data ownership and lifetime.
+- Completion and error representation.
+
+The design should avoid requiring every payload to be serialized into a copied message.
+
+Where safe and practical, references to managed buffers or other shared resources may be more efficient.
+
+## 6. Memory and Data Representation
+
+Data crossing the ABI boundary must have an unambiguous representation.
+
+The ABI should define the interpretation of externally visible values independently of the compiler and CPU architecture.
+
+### 6.1 Fixed-width types
+
+Binary structures should use explicitly sized integer types where their width is part of the contract.
+
+For example, an identifier intended to be 64 bits must remain 64 bits regardless of whether the application is running on a 32-bit or 64-bit architecture.
+
+Native-sized types should be avoided in persistent or externally shared structures unless their interpretation is explicitly defined.
+
+### 6.2 Pointers and references
+
+Raw native pointers are architecture-specific and should not be used as portable identifiers or persistent references.
+
+The ABI may permit pointers within a defined native execution context, but their scope and validity must be explicit.
+
+For cross-component or shared-memory references, the design should consider architecture-independent handles, offsets, or other managed references.
+
+The exact mechanism remains undecided.
+
+### 6.3 Alignment and layout
+
+Structures shared across the ABI boundary must have explicitly defined layout rules.
+
+Compiler defaults must not determine the meaning of ABI-visible data.
+
+Where structures contain reserved fields, their required values and future interpretation should be documented.
+
+This will help preserve compatibility as the ABI evolves.
+
+### 6.4 Endianness
+
+The ABI must define byte order for binary representations that may be shared across architectures or persisted.
+
+The chosen representation should be consistent and independent of the native endianness of the CPU.
+
+## 7. Operation Completion and Errors
+
+Applications need a consistent way to determine the outcome of submitted work.
+
+The ABI should distinguish between:
+
+- Successful completion.
+- Successful completion with returned data.
+- Failure.
+- Pending operations.
+- Cancellation.
+- Timeout.
+- Authorization denial.
+- Resource exhaustion.
+- Unsupported operations.
+
+Services may define additional error information relevant to their functionality.
+
+The ABI should provide a common representation for general error conditions while allowing service-specific detail.
+
+Error handling should not depend on parsing human-readable strings.
+
+### 7.1 Request correlation
+
+Applications may have multiple outstanding operations.
+
+The ABI needs a reliable mechanism to associate each completion with its originating request.
+
+The mechanism should not require operations to complete in submission order unless the service explicitly guarantees that ordering.
+
+### 7.2 Error namespaces
+
+Service-specific errors should not collide with general ABI errors.
+
+The exact error-code allocation and namespace structure remain to be defined.
+
+## 8. Synchronous and Asynchronous Interfaces
+
+The ABI should support both synchronous and asynchronous application interactions.
+
+The underlying execution model remains queue-centric.
+
+A synchronous interface may allow an application to wait for a particular operation to complete, while an asynchronous interface allows the application to continue working and collect completion information later.
+
+The ABI should avoid creating separate and incompatible service interfaces merely to support these two interaction styles.
+
+Whether synchronous operations are implemented as wrappers around asynchronous queue operations remains open.
+
+The exact waiting, cancellation, and timeout conventions will be specified when the queue interface is finalized.
+
+## 9. Authorization and Rights
+
+The ABI must integrate with the QueueOS security model.
+
+Applications may only perform operations permitted by their granted Rights.
+
+The ABI should make authorization failures distinguishable from other operation failures.
+
+However, the ABI itself is not the authority that grants permissions.
+
+The OS maintains the authoritative authorization state and enforces it when protected operations are requested.
+
+An application must not be able to bypass authorization by calling a lower-level ABI operation or constructing a request manually.
+
+The ABI should also support services that expose operations with different permission requirements.
+
+Possession of access to a service does not automatically authorize every operation that service provides.
+
+## 10. Application Startup
+
+The ABI must define how an application begins execution and establishes its initial relationship with the OS.
+
+The startup contract will need to establish:
+
+- Application identity.
+- ABI compatibility information.
+- Initial execution context.
+- Access to permitted OS interfaces.
+- Initial resource availability.
+- Application entry point.
+- Startup arguments or equivalent initialization data.
+
+The application should not need to discover internal OS implementation details to initialize itself.
+
+The precise startup structure and calling convention remain open.
+
+## 11. OS Service Interfaces
+
+The ABI provides the common contract through which applications interact with OS services.
+
+Individual services define their own operation sets and associated data structures.
+
+Examples include:
+
+| Service | Example functionality |
 |---|---|
-| Application ID | Stable application identity |
-| Name | Human-readable application name |
-| Version | Application release version |
-| Publisher | Application publisher or maintainer |
-| Description | Short application description |
-| Features | Functionality provided by the application |
-| Requested Rights | Permissions requested by the application |
-| Entry point | Application startup entry point |
-| ABI version | Required QueueOS application ABI |
-| Dependencies | Other required components or services |
-| Architecture | Supported execution architectures, where relevant |
-| Package format version | Version of the application package specification |
-| Icon and presentation metadata | Information used by the application interface |
+| Storage | Read, write, create, and manage objects |
+| Database | Execute queries and manage data |
+| Networking | Establish connections and exchange data |
+| Desktop | Create windows and interact with the desktop |
+| Notifications | Register and receive notifications |
+| Devices | Discover and access authorized hardware |
 
-This is a conceptual list, not a finalized manifest schema.
+This list is illustrative rather than a finalized service catalogue.
 
-The manifest must distinguish application-provided information from information controlled by the OS.
+The ABI should make it possible to add services and extend existing ones without requiring changes to unrelated application interfaces.
 
-In particular, an application may declare its requested Rights, but only the OS can record and enforce the Rights actually granted.
+Service interfaces should have their own versioning and compatibility rules where necessary.
 
-## 5. Features and Rights
+## 12. Executable Format and ABI Separation
 
-QueueOS distinguishes between application Features and Rights.
+The executable format and the ABI are related but distinct.
 
-### 5.1 Features
+The executable format determines how application code is represented and loaded.
 
-Features describe what an application provides.
-
-Examples include:
-
-- Email.
-- Calendar.
-- Contacts.
-- Image editing.
-- File management.
-- Database administration.
-- Network monitoring.
-- Audio playback.
-
-Features can help users discover applications and understand their purpose.
-
-They may also allow the OS to organize applications into categories or expose their capabilities to other system components.
-
-Features are descriptive. They do not grant permission to access OS resources.
-
-### 5.2 Requested Rights
-
-Applications declare the Rights they need to operate.
-
-Examples include:
-
-- Read or write selected files.
-- Access a storage namespace.
-- Use network services.
-- Access a particular device.
-- Display notifications.
-- Communicate with another application.
-- Access a specific OS service.
-
-Requests should be scoped as narrowly as practical.
-
-An application should be able to identify which Rights are essential and which enable optional functionality.
-
-### 5.3 Granted Rights
-
-The OS maintains the authoritative record of granted Rights.
-
-An application cannot grant itself permissions by modifying its own manifest or installation metadata.
-
-The installation and authorization process is described in `SECURITY.md`.
-
-## 6. Application Packages
-
-Applications must be distributable in a package format that contains the information and resources necessary for installation.
-
-A package may contain:
-
-- Application metadata.
-- Executable code.
-- Required application resources.
-- Icons and presentation assets.
-- Localization data.
-- Supporting libraries or modules.
-- Installation or migration metadata, where necessary.
-- Integrity information.
-
-The package format should be designed for efficient inspection, verification, installation, and updating.
-
-It should not require an application to be installed into the OS Database.
-
-The exact package container, compression format, signing mechanism, and internal directory structure remain undecided.
-
-### 6.1 Package integrity
-
-QueueOS should be able to verify that application packages have not been corrupted or modified unexpectedly.
-
-Package integrity and publisher authenticity are related but separate concerns.
-
-A checksum can detect accidental corruption, but it does not establish who published a package.
-
-The package trust model, including signing and publisher verification, will be specified separately.
-
-### 6.2 Package portability
-
-The application package format should avoid unnecessary architecture-specific assumptions.
-
-Where an application includes native executable code, its compatibility with the target architecture and QueueOS ABI must be established.
-
-Applications may also include architecture-independent resources or executable modules.
-
-The package format should accommodate these differences without requiring unrelated application metadata to be duplicated for every architecture.
-
-## 7. Application Executables
-
-Applications execute using the QueueOS application ABI.
-
-The ABI defines the externally visible contract between applications and the operating system, including access to queues and OS services.
-
-The application model should not require applications to depend directly on internal OS implementation details.
-
-### 7.1 Executable format
+The ABI determines how that code interacts with the operating system.
 
 ELF has been considered as a possible executable container.
 
-This does not imply that QueueOS will implement Linux ABI compatibility or adopt Linux execution semantics.
+This does not imply that QueueOS will adopt the Linux ABI, Linux system-call interface, or Linux execution model.
 
-The executable format and the application ABI are separate concerns:
+QueueOS may use an established executable format while providing its own application ABI.
 
-- The executable format describes how executable content is represented and loaded.
-- The ABI describes how applications interact with the operating system.
+The final executable format and loader contract remain open design decisions.
 
-The final executable format remains an open design decision.
+## 13. Language and Runtime Support
 
-### 7.2 Application runtime
+The ABI should be language-neutral.
 
-Applications may use native executable code, interpreted languages, or other supported execution environments.
+Applications written in C, C++, or other compiled languages should be able to use the same underlying OS interfaces.
 
-The OS may provide shared runtime components for particular languages or application frameworks.
+Interpreted languages and managed runtimes may also expose application functionality through the ABI.
 
-Lua is one runtime being considered as part of the broader QueueOS environment.
+Lua is one runtime being considered for the QueueOS environment.
 
-The application model should allow applications to use supported runtimes without requiring every application to bundle an independent copy.
+A runtime may provide higher-level abstractions for applications, but it should ultimately use the same OS-facing contracts.
 
-Runtime availability, version compatibility, and isolation requirements will be addressed as the execution architecture develops.
+The ABI should not require every language runtime to independently implement low-level OS communication.
 
-## 8. Application Installation
+Language-specific libraries and bindings may be provided as convenience layers above the ABI.
 
-Installation introduces an application into the system and establishes its identity, resources, and authorization state.
+These libraries must not introduce incompatible semantics or bypass OS authorization.
 
-A conceptual installation sequence is:
+## 14. ABI Versioning and Compatibility
 
-1. Locate or receive the application package.
-2. Inspect its metadata.
-3. Validate package structure and integrity.
-4. Check ABI and runtime compatibility.
-5. Identify dependencies.
-6. Present the application information and requested Rights to the user.
-7. Obtain the user's authorization decisions.
-8. Install application resources.
-9. Register the application with the OS.
-10. Make the application available for execution.
+The ABI must evolve without unnecessarily breaking existing applications.
 
-The exact sequence may vary as the implementation develops, but authorization must occur before the application can exercise newly requested Rights.
+The design should distinguish between:
 
-### 8.1 Installation authorization
+- The overall ABI version.
+- Individual service interface versions.
+- Optional capabilities.
+- Runtime versions.
+- Executable format versions.
 
-The installation interface should display:
+An application should be able to declare the ABI version and service interfaces it requires.
 
-- Application name and publisher.
-- Application description.
-- Declared Features.
-- Requested Rights.
-- Required and optional permissions.
-- Compatibility information.
-- Any additional warnings relevant to installation.
+The OS should be able to determine whether it can execute the application before starting it.
 
-Users should be able to understand what they are installing and what access they are granting.
+### 14.1 Compatible extensions
 
-An application should not silently acquire additional permissions through its installation process.
+New functionality should preferably be introduced in a way that does not change the meaning of existing operations.
 
-### 8.2 Dependencies
+Possible approaches include:
 
-Applications may depend on shared OS services, runtimes, or other application components.
+- New operation identifiers.
+- Optional fields.
+- Versioned service interfaces.
+- Explicit capability discovery.
+- Reserved fields for future extension.
 
-The package metadata should identify dependencies sufficiently for the OS to determine whether installation is possible.
+These are design options, not finalized rules.
 
-Dependency resolution should avoid unnecessary duplication of shared components.
+### 14.2 Breaking changes
 
-The exact dependency model, including version constraints and conflict resolution, remains open.
+Changes that alter the interpretation or behaviour of existing ABI operations must be treated as compatibility-breaking changes.
 
-## 9. Application Storage
+The project should avoid introducing breaking changes casually.
 
-Application executable content and application data must be managed separately from the OS Database.
+Where breaking changes become necessary, the transition strategy should be documented and should account for installed applications.
 
-The OS Database contains the components and state necessary to operate QueueOS.
+## 15. Performance and Optimization
 
-Installed applications are outside that database.
+The ABI should be designed with performance as a first-class consideration.
 
-Application storage may include:
+It should not impose unnecessary overhead on common operations.
 
-- Executable files.
-- Resources and assets.
-- Application configuration.
-- User-generated data.
-- Cache data.
-- Logs.
-- Application-specific databases.
-- Temporary files.
+Potential sources of overhead include:
 
-The OS should provide a consistent way to identify and manage application-owned storage.
+- Data copying.
+- Serialization and deserialization.
+- Excessive validation layers.
+- Context switches.
+- Redundant authorization checks.
+- Excessive queue transitions.
+- Unnecessary memory allocation.
 
-Applications should not need unrestricted access to the physical storage layout.
+These costs should be measured rather than assumed.
 
-Instead, storage access should be provided through authorized OS interfaces.
+### 15.1 Fast paths
 
-The precise application storage namespace and directory layout remain undecided.
+Frequently used operations may benefit from optimized paths.
 
-## 10. Application Execution Lifecycle
+However, fast paths must preserve the same security and behavioural guarantees as ordinary operations.
 
-An application has a lifecycle managed by the OS.
+An optimization must not become a separate, weaker authorization mechanism.
 
-Conceptually, the lifecycle includes:
+### 15.2 Architecture-specific optimization
 
-1. Available for execution.
-2. Starting.
-3. Running.
-4. Suspended or inactive, where supported.
-5. Stopping.
-6. Terminated.
+Architecture-specific optimizations are permitted internally.
 
-These are logical lifecycle states, not a commitment to conventional process semantics.
+They must preserve the ABI contract and must not introduce application-visible differences that violate the defined behaviour.
 
-The implementation must define how applications acquire execution resources, establish queue connections, initialize their runtime, and release resources when they stop.
+## 16. Documentation and Testing
 
-### 10.1 Startup
+Every ABI operation must be documented sufficiently for an independent application developer to use it correctly.
 
-When an application starts, the OS should establish the execution context and make the application's authorized interfaces available.
+Documentation should define:
 
-The application should not receive unrestricted access to OS services merely because it has started.
-
-Startup should validate any required runtime, ABI, and service dependencies.
-
-### 10.2 Termination
-
-When an application stops, the OS must account for its outstanding work and resources.
-
-This includes:
-
-- Pending queue operations.
-- Active service interactions.
-- Open resources.
-- Allocated memory.
-- Event subscriptions.
-- Temporary storage.
-- Application-specific runtime state.
-
-The treatment of outstanding operations should follow the relevant service and execution semantics.
-
-### 10.3 Multiple instances
-
-Whether an application may have multiple simultaneous instances is a property that should be declared or otherwise defined.
-
-Some applications naturally support multiple instances, while others may require a single shared instance.
-
-The application model should accommodate both without imposing a universal single-instance or multi-instance rule.
-
-## 11. Application Updates
-
-Updates replace or modify an installed application's executable content and resources while preserving its identity.
-
-A conceptual update process is:
-
-1. Identify the installed application.
-2. Validate the new package.
-3. Check compatibility and dependencies.
-4. Compare requested Rights with the current authorization state.
-5. Request authorization for any additional Rights.
-6. Prepare the updated application resources.
-7. Apply the update.
-8. Preserve or migrate application data as required.
-9. Record the new installed version.
-
-An update must not silently expand the application's granted Rights.
-
-### 11.1 Versioning
-
-Applications need an explicit version identifier.
-
-The versioning scheme should support compatibility checks and dependency resolution.
-
-The exact versioning convention has not been finalized.
-
-### 11.2 Data migration
-
-Application updates may require changes to stored application data.
-
-Migration should be explicit and should avoid leaving application data partially converted if an update fails.
-
-Where practical, the system should provide a way to recover from an unsuccessful update.
-
-The precise migration and rollback mechanisms remain open.
-
-## 12. Application Removal
-
-Uninstallation removes an application from the available application environment.
-
-The OS should:
-
-- Stop the application if it is running.
-- Prevent new execution.
-- Revoke its granted Rights.
-- Remove its registration and discovery metadata.
-- Invalidate associated queue references and access.
-- Remove application executable resources.
-- Handle dependencies and shared resources safely.
-- Apply the selected policy for application-owned data.
-
-Application data should not necessarily be deleted automatically in every case.
-
-Users may want to retain data for backup, migration, or later reinstallation.
-
-The removal interface should make data retention and deletion behaviour clear.
-
-Shared runtimes and dependencies must not be removed while still required by other applications.
-
-## 13. Application Discovery and Launching
-
-QueueOS should provide a consistent mechanism for discovering installed applications and making them available to the user.
-
-Discovery may use application metadata, including:
-
-- Application identity.
-- Display name.
-- Icon.
-- Features.
-- Version.
-- Availability.
-- Execution entry point.
-
-The desktop environment may use this information to present an application launcher, organize applications, or expose application-specific actions.
-
-Discovery is separate from authorization.
-
-An application being visible or discoverable does not imply that it has permission to access a particular resource.
-
-The exact application discovery and launching interfaces remain open.
-
-## 14. Application-to-Application Interaction
-
-Applications may need to exchange information or request functionality from other applications.
-
-QueueOS should provide a controlled mechanism for this interaction.
-
-The queue model is the natural foundation for such communication.
-
-Applications should be able to expose defined interfaces, and other applications should be able to request access to those interfaces subject to authorization.
-
-Potential examples include:
-
-- Opening a document in another application.
-- Sending information to a mail client.
-- Requesting a calendar operation.
-- Passing an object to an image editor.
-- Invoking a service provided by another application.
-
-The architecture should not require applications to share internal memory or private storage simply to exchange information.
-
-The exact discovery, invocation, and authorization mechanisms remain to be defined.
-
-## 15. Application and OS Component Boundaries
-
-Applications and OS components have different roles.
-
-OS components provide foundational functionality required by the operating system.
-
-Applications provide independently installed functionality to users.
-
-The OS Database contains the system components needed to reach an operational OS. Installed applications are managed separately.
-
-Applications should consume OS services through supported interfaces rather than depending on the physical location or internal representation of system components.
-
-This separation allows the OS to evolve its internal implementation without requiring every application to be rewritten.
-
-## 16. Compatibility
-
-Application compatibility depends on several independent factors:
-
-- QueueOS ABI compatibility.
-- Executable format compatibility.
-- Required runtime availability.
-- OS service availability.
-- Dependency versions.
-- Required application Rights.
-
-The application metadata should identify relevant compatibility requirements.
-
-The OS should be able to determine whether an application can run before attempting execution.
-
-Architecture-specific executable code may require different package content for different CPU architectures, but the application-facing ABI should remain consistent.
-
-Compatibility should be treated as an explicit contract rather than an assumption based on executable format alone.
+- Operation purpose.
+- Required inputs.
+- Returned values.
+- Error conditions.
+- Required Rights.
+- Data ownership and lifetime.
+- Ordering guarantees.
+- Cancellation behaviour.
+- Compatibility requirements.
+
+The ABI should have conformance tests that can be run against implementations on every supported architecture.
+
+Tests should verify both the binary contract and observable behaviour.
+
+Where practical, the same application-level test suite should be usable across architectures.
+
+This is essential to demonstrating that QueueOS really provides one consistent application ABI.
 
 ## 17. Open Design Questions
 
 The following questions remain unresolved.
 
-### Identity and metadata
+### Binary contract
 
-- What is the canonical application identifier format?
-- What is the final application manifest schema?
-- How are publisher identities represented?
-- How are application Features standardized or categorized?
+- What calling convention will the ABI use?
+- What are the canonical integer and structure types?
+- How are handles and references represented?
+- What are the rules for alignment and padding?
+- What byte order is used for shared binary representations?
 
-### Package format
+### Queue interface
 
-- What container format will application packages use?
-- Will packages support compression and deduplication?
-- How will package integrity be verified?
-- What signing and trust model will be used?
-- How will architecture-specific and architecture-independent resources coexist?
+- What are the exact queue operations?
+- How are requests and completions represented?
+- How are queue references acquired and released?
+- How are events delivered?
+- What are the cancellation and timeout conventions?
 
-### Execution
+### Memory
 
-- What executable format will be supported?
-- What is the precise application startup contract?
-- How are runtime dependencies managed?
-- How are multiple instances represented?
-- What lifecycle controls are exposed to applications?
+- How are buffers shared between applications and services?
+- Are zero-copy operations supported?
+- How are ownership and lifetime managed?
+- How are shared-memory references represented across architectures?
 
-### Installation and updates
+### Startup and execution
 
-- How are dependencies resolved?
-- How are application updates staged and committed?
-- What rollback guarantees are provided?
-- How are data migrations handled?
-- How are additional Rights requested during updates?
+- What is the application startup contract?
+- What executable formats will be supported?
+- How is ABI compatibility declared and negotiated?
+- How are runtime environments integrated?
 
-### Storage and removal
+### Versioning
 
-- What is the canonical application storage namespace?
-- How are application-owned databases managed?
-- What data is retained after uninstallation?
-- How are shared dependencies tracked?
+- What constitutes an ABI-breaking change?
+- How are service interface versions represented?
+- How are optional capabilities discovered?
+- How long must older ABI versions remain supported?
 
-### Discovery and interaction
+### Performance
 
-- How are applications registered and discovered?
-- How are application entry points represented?
-- How do applications publish interfaces?
-- How is application-to-application access authorized?
+- Which operations require optimized fast paths?
+- What is the minimum overhead for a queue submission?
+- How should architecture-specific optimizations be exposed, if at all?
+- What benchmarks will define acceptable performance?
 
-These questions should be resolved as the package, execution, and security implementations mature.
+These questions should be resolved through implementation, testing, and measurement rather than speculative complexity.
 
 ## 18. Current Direction and Commitments
 
 ### Established direction
 
-- Applications are independently installable and removable.
-- Installed applications are stored outside the OS Database.
-- Applications use the stable QueueOS application ABI.
-- Queue-based interaction is the primary application-to-OS interface.
-- Applications declare their Features and requested Rights.
-- Features and Rights remain separate concepts.
-- The OS controls and enforces granted Rights.
-- Installation includes an authorization review.
-- Updates must not silently expand application permissions.
-- Application data and executable content have managed lifecycles.
+- QueueOS provides one stable application-facing ABI across supported CPU architectures.
+- Queues are the primary application-to-OS interaction mechanism.
+- The ABI defines the external contract, not the internal implementation.
+- Applications interact with OS services through defined interfaces.
+- Authorization and granted Rights apply to ABI operations.
+- The ABI should be language-neutral.
+- The ABI should avoid unnecessary copying, serialization, and execution overhead.
+- Architecture-specific optimizations must preserve the common contract.
+- Executable format and ABI are separate concerns.
+- ELF has been considered, but Linux ABI compatibility is not an established goal.
 
 ### Not yet established
 
-- Application identity format.
-- Manifest schema.
-- Package container format.
-- Executable format.
-- Package signing and publisher trust.
-- Dependency resolution.
-- Runtime packaging and compatibility.
-- Application storage layout.
-- Application lifecycle implementation.
-- Multiple-instance behaviour.
-- Application discovery and inter-application invocation mechanisms.
-- Update staging, rollback, and data migration mechanisms.
+- Calling convention.
+- Binary structure definitions.
+- Queue operation identifiers and layouts.
+- Handle and reference representation.
+- Memory-sharing model.
+- Error-code allocation.
+- Startup contract.
+- Executable format and loader.
+- ABI and service versioning rules.
+- Runtime integration details.
+- Conformance-test specification.
 
 Implementation decisions should preserve the established direction while treating unresolved mechanisms as design work.
 
 ---
 
-**Status:** Application architecture and lifecycle direction established; package and execution mechanisms under design.
+**Status:** ABI architectural direction established; binary contract and implementation under design.
 
 **Related documents:**
 - `ARCHITECTURE.md`
+- `APPLICATIONS.md`
 - `DATABASE.md`
 - `EXECUTION.md`
 - `SECURITY.md`
