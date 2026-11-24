@@ -50,6 +50,8 @@ Avoid introducing heavyweight runtime dependencies without a compelling architec
 
 Lua is also part of the project's development and modularity exploration, including its potential use for reference implementations and module definitions.
 
+Script that ships in the operating system is Lua. Host checks and the test harness are Bash. Section 11 is the rule for languages, file size, and filenames.
+
 ### 2.5 Modularity
 
 Operating system components should have well-defined responsibilities and interfaces.
@@ -276,4 +278,46 @@ Do not introduce features simply because conventional operating systems provide 
 **Understand the architecture. Preserve its intent. Challenge it constructively. Implement carefully. Validate the result. Document what changed.**
 
 QueueOS should evolve through deliberate engineering decisions rather than accumulating conventional operating system assumptions by default.
+
+## 11. Language, size, and filenames
+
+These rules apply to every QueueOS file an agent creates or edits.
+
+### 11.1 No Python
+
+QueueOS does not use Python. That includes scripts, generators, checkers, build steps, and tests. Do not add a `.py` file. Do not invoke `python`, `python3`, or a Python module from CMake or from a script.
+
+### 11.2 Which language
+
+C is the native implementation language, as section 2.4 says.
+
+Script that ships in the operating system is Lua. Boot screens, menus, and module definitions that run on QueueOS are Lua.
+
+The test harness and the host checks are Bash. A check that `ctest` runs, and the QEMU runner, are shell scripts.
+
+Host programs that build artifacts are C. The image builder and the PE relocation tool are host C programs. They may execute existing system tools such as `mkfs.fat`, `mmd`, `mcopy`, and `qemu-img`.
+
+`tests/test-queueos.lua` is the interactive catalogue. It is Lua. It lists cases and does not launch QEMU. It stays Lua.
+
+### 11.3 Source file length
+
+A QueueOS source file stays at or under 1,000 lines. Split a file before it crosses that line. Generated output under `build/` is not a source file.
+
+### 11.4 Filenames
+
+QueueOS filenames use dashes, not underscores. This applies to files and directories the project creates.
+
+C identifiers keep their underscores. An identifier is not a filename.
+
+Names that belong to an external tool stay as that tool spells them. `qemu-system-x86_64` and the objcopy target `efi-app-x86_64` are examples. An architecture token passed to a tool is not a filename this project chose.
+
+### 11.5 Vendored trees
+
+`vendored/<project>/` holds unmodified third-party source. Those files keep the upstream names and the upstream lengths. Do not rename, reformat, or split them to satisfy 11.3 or 11.4.
+
+Unity 2.7.0 is the current case. `unity.c` and `unity_internals.h` are longer than 1,000 lines, and `unity_internals.h` uses an underscore. Leave that tree untouched.
+
+A new import is recorded the same way, with its license and `VERSION`, and the upstream files stay as they arrived.
+
+QueueOS files outside `vendored/` follow 11.1 through 11.4.
 

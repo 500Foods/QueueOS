@@ -111,7 +111,7 @@ QueueOS/
 ├── src/
 │   ├── common/
 │   ├── arch/
-│   │   ├── x86_64/
+│   │   ├── x86-64/
 │   │   ├── aarch64/
 │   │   └── riscv64/
 │   ├── bootstrap/
