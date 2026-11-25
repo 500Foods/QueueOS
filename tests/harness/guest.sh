@@ -150,6 +150,9 @@ start_guest() {
     else
         args+=(-vga none -display none)
     fi
+    # The token is taken from the -machine argument, not from a second
+    # read of image.conf. meta.txt records the conf value on its own.
+    write_machine_token "${args[@]}" || return 1
     "${args[@]}" >"$GUEST_DIR/qemu.err" 2>&1 &
     GUEST_PID=$!
     local _try
@@ -161,9 +164,25 @@ start_guest() {
     guest_accel >"$GUEST_DIR/accel.txt"
 }
 
+# machine.txt sits beside accel.txt. The string is the machine token
+# inside the -machine argument, before the accel list.
+write_machine_token() {
+    local prev="" arg
+    for arg in "$@"; do
+        if [[ $prev == -machine ]]; then
+            printf '%s\n' "${arg%%,*}" > "$GUEST_DIR/machine.txt"
+            return 0
+        fi
+        prev=$arg
+    done
+    echo "qemu command has no -machine" >&2
+    return 1
+}
+
 # One catalogue case. Screenshot checks dump when EXPECT appears.
 # serial-order waits for the Base sentence. serial-absent runs a short
-# window and requires EXPECT to stay missing.
+# window and requires EXPECT to stay missing. A mutation is applied to
+# the work copy after the copy and before QEMU starts.
 guest_case() {
     local image_dir=$1 check=$2 expect=$3
     local deadline shot
@@ -171,6 +190,7 @@ guest_case() {
     GUEST_SERIAL=$GUEST_DIR/serial.log
     GUEST_SOCK=$GUEST_DIR/qmp.sock
     prepare_work "$image_dir" || return 1
+    apply_mutation "${CASE_MUTATE:-none}" || return 1
     start_guest "$image_dir" headless || { guest_stop; return 1; }
     deadline=$((SECONDS + 50))
     case $check in
@@ -221,7 +241,51 @@ guest_case() {
         screenshot-not-requested)
             [[ ! -e $GUEST_DIR/screenshot.ppm ]]
             ;;
-    esac
+    esac || return 1
+    judge_forbids || return 1
+    judge_annotation || return 1
+    judge_machine "$image_dir"
+}
+
+# forbid= lines are fixed strings that must be absent from serial.log.
+judge_forbids() {
+    local line
+    [[ -n ${CASE_FORBIDS:-} ]] || return 0
+    [[ -f $GUEST_SERIAL ]] || { echo "serial.log is missing" >&2; return 1; }
+    while IFS= read -r line; do
+        [[ -z $line ]] && continue
+        if grep -F -q -- "$line" "$GUEST_SERIAL"; then
+            echo "serial contains forbidden text: $line" >&2
+            return 1
+        fi
+    done <<< "$CASE_FORBIDS"
+}
+
+# The annotation is the case file's sentence, written before this judgment.
+# It is not scraped from firmware text.
+judge_annotation() {
+    [[ -n ${CASE_ANNOTATION:-} ]] || return 0
+    [[ -f $GUEST_DIR/annotation.txt ]] || { echo "annotation.txt is missing" >&2; return 1; }
+    if ! grep -F -x -q -- "$CASE_ANNOTATION" "$GUEST_DIR/annotation.txt"; then
+        echo "annotation.txt does not contain the case sentence" >&2
+        return 1
+    fi
+}
+
+# Pass when the token QEMU was given matches image.conf. A pc case then
+# requires machine.txt to be pc, because that file says so.
+judge_machine() {
+    local image_dir=$1 want got
+    want=$(conf_get machine "$image_dir/image.conf") || {
+        echo "image.conf has no machine" >&2
+        return 1
+    }
+    [[ -f $GUEST_DIR/machine.txt ]] || { echo "machine.txt is missing" >&2; return 1; }
+    got=$(head -n 1 "$GUEST_DIR/machine.txt")
+    [[ $got == "$want" ]] || {
+        echo "machine.txt is ${got}, image.conf machine is ${want}" >&2
+        return 1
+    }
 }
 
 guest_order() {

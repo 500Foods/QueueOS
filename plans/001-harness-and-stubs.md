@@ -258,7 +258,7 @@ CMake is the front door. The lists live in `cmake/` and the root `CMakeLists.txt
 | `cmake --build build` | Build the host tests, both EFI stubs, the current database image, and the `a-001` and `a-002` boot folders. |
 | `cmake --build build --target test-first` | Run `tests/suites/first-batch.list` under one new run id. Exit non-zero if any case fails. |
 | `cmake --build build --target test-case` | Run the case named by `-DCASE=D-001-001` under one new run id. |
-| `cmake --build build --target test-second` | Not a target. Plan 002 adds it with the second-batch list and `a-003-pc-base`. |
+| `cmake --build build --target test-second` | Not a target. Plan 002 adds it with the second-batch list and `a-003-pc-base`. Plan 002 closed with that target in place. |
 | `cmake --build build --target run` | Boot `images/a-001-q35-base` and leave the screen up. |
 | `cmake --build build --target clean` | Remove build products under `build/`. Leave `images/` disks and `results/` in place. |
 
@@ -487,7 +487,7 @@ A later boot folder may set `qemu` to `qemu-system-aarch64` and name a firmware 
 5. Add `tools/mkimage.c`, the `image.conf` files, the database version, the `a-001` and `a-002` folders, and the A-001 checks. Done. `image-a001` passes. The builder is host C and the checks are Bash. `a-003` waits in plan 002. `images/a-001-q35-base/vm.conf` names the local guest copy that the image build refreshes. `tools/mkimage.c` is 985 lines. Plan 002 adds `a-003` as another `image.conf`, which the existing folder scan already picks up.
 6. Add the harness and the D and E cases. Done. Each case names its boot folder. The runner is `tests/harness/run.sh`. `cmake --build build --target test-first` runs the first batch.
 7. Run `test-first` and fix the slice until the first batch passes. Done. `results/000-005` is eighteen passes. The counter's next id is `000-006`.
-8. Second batch. Moved to plan 002. `test-second` does not exist yet.
+8. Second batch. Moved to plan 002. `test-second` does not exist yet. Plan 002 added it. `results/000-007` is the six passes.
 9. `tests/README.md` covers the first batch: how to run it, where a result goes, the scaffold sentence from section 5, the two countdowns, the menu names, and the red-on-red attribute. The two-suite note waits until plan 002 has a second suite. The red-pixel calibration in section 9 was not required. The thresholds held.
 10. Done. `brainstorming/` stays exploration. The stub sentences and the ESP-resident Base are a scaffold.
 
@@ -502,7 +502,7 @@ Met on this machine:
 
 Moved to plan 002:
 
-- `test-second` exits 0, with the six second-batch cases passed.
+- `test-second` exits 0, with the six second-batch cases passed. Met in plan 002 as `results/000-007`, followed by `results/000-008` for the first batch.
 
 ## 15. What the first real runs actually did
 

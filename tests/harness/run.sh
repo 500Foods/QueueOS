@@ -48,8 +48,11 @@ HARNESS=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 source "$HARNESS/host-checks.sh"
 # shellcheck source=guest.sh
 source "$HARNESS/guest.sh"
+# shellcheck source=mutate.sh
+source "$HARNESS/mutate.sh"
 
-conf_get() {
+# Every value of key, one per line. A missing key prints nothing.
+conf_values() {
     local key=$1 file=$2 line trimmed k v
     [[ -f $file ]] || return 1
     while IFS= read -r line || [[ -n ${line:-} ]]; do
@@ -64,11 +67,16 @@ conf_get() {
         v=${v#"${v%%[![:space:]]*}"}
         v=${v%"${v##*[![:space:]]}"}
         if [[ $k == "$key" ]]; then
-            printf '%s' "$v"
-            return 0
+            printf '%s\n' "$v"
         fi
     done < "$file"
-    return 1
+}
+
+conf_get() {
+    local value
+    value=$(conf_values "$1" "$2" | head -n 1) || return 1
+    [[ -n $value ]] || return 1
+    printf '%s' "$value"
 }
 
 qemu_version() {
@@ -112,6 +120,15 @@ result=${result}
 EOF
 }
 
+# Host checks do not have a work copy. A mutation there would be a miss.
+host_only() {
+    if [[ ${CASE_MUTATE:-none} != none ]]; then
+        echo "mutate=${CASE_MUTATE} is not valid for ${check}" >&2
+        return 1
+    fi
+    "$@"
+}
+
 run_one() {
     local id=$1
     local conf=$ROOT/tests/cases/$id/case.conf
@@ -123,8 +140,16 @@ run_one() {
     check=$(conf_get check "$conf") || die "$id has no check"
     image=$(conf_get image "$conf" || true)
     expect=$(conf_get expect "$conf" || true)
+    CASE_MUTATE=$(conf_get mutate "$conf" || true)
+    [[ -n $CASE_MUTATE ]] || CASE_MUTATE=none
+    CASE_ANNOTATION=$(conf_get annotation "$conf" || true)
+    CASE_FORBIDS=$(conf_values forbid "$conf" || true)
     dir=$RUN_DIR/$id
     mkdir -p "$dir"
+    # The sentence comes from the case file. Judgment reads it back.
+    if [[ -n $CASE_ANNOTATION ]]; then
+        printf '%s\n' "$CASE_ANNOTATION" > "$dir/annotation.txt"
+    fi
     CASE_LABEL=$id
     GUEST_DIR=$dir
     if [[ -n $image ]]; then
@@ -140,11 +165,14 @@ run_one() {
     esac
     set +e
     case $check in
-        tool-presence) host_tool_presence ;;
-        build-products) host_build_products ;;
-        unity) host_unity ;;
+        tool-presence) host_only host_tool_presence ;;
+        build-products) host_only host_build_products ;;
+        unity) host_only host_unity ;;
         image-checksum|image-database-blank|image-esp|image-payloads|image-base-size)
-            bash "$ROOT/tests/host/check-images.sh" --root "$ROOT" --check "$check"
+            host_only bash "$ROOT/tests/host/check-images.sh" --root "$ROOT" --check "$check"
+            ;;
+        image-pc-same)
+            host_only host_pc_same
             ;;
         serial-contains|serial-order|serial-absent|screenshot-present|screenshot-red|screenshot-not-requested)
             [[ -n $image ]] || die "$id has no image"

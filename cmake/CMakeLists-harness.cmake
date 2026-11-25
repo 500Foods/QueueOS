@@ -1,5 +1,6 @@
-# QEMU harness. tests/harness/run.sh is Bash. test-second waits until
-# images/a-003-pc-base exists. A case id is selected at configure time:
+# QEMU harness. tests/harness/run.sh is Bash. test-second runs the
+# second batch, including images/a-003-pc-base. A case id is selected
+# at configure time:
 #   cmake -S . -B build -DCASE=D-001-001
 #   cmake --build build --target test-case
 
@@ -10,6 +11,16 @@ add_custom_target(test-first
             --root "${CMAKE_SOURCE_DIR}"
             --build "${CMAKE_BINARY_DIR}"
             --suite "${CMAKE_SOURCE_DIR}/tests/suites/first-batch.list"
+    DEPENDS sentences images
+    USES_TERMINAL
+    VERBATIM
+)
+
+add_custom_target(test-second
+    COMMAND bash "${CMAKE_SOURCE_DIR}/tests/harness/run.sh"
+            --root "${CMAKE_SOURCE_DIR}"
+            --build "${CMAKE_BINARY_DIR}"
+            --suite "${CMAKE_SOURCE_DIR}/tests/suites/second-batch.list"
     DEPENDS sentences images
     USES_TERMINAL
     VERBATIM

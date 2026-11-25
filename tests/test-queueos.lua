@@ -4,8 +4,8 @@
 -- Interactive catalogue of QueueOS tests. The shell alias tq points here.
 --
 -- No arguments, on a terminal, opens a full-screen list: each case, the
--- last run that recorded it, and that run's result. `all` is reserved for
--- running every case. `all` calls tests/harness/run.sh on the first batch.
+-- last run that recorded it, and that run's result. `all` calls
+-- tests/harness/run.sh on the first batch. The second batch is test-second.
 -- This file still does not build a QEMU command of its own.
 --
 -- The screen uses terminal.lua, the same library Hydrogen's SchemaHelper
@@ -29,7 +29,7 @@ local USAGE = [[
 Usage: test-queueos.lua [all]
 
   (no arguments)   list tests and their last results
-  all              run every test
+  all              run the first batch
   --help           show this help
 
 On a terminal the list is a full-screen TUI. The background is red.

@@ -1,10 +1,12 @@
 # 002 — Second batch
 
-Status: ready to implement. Nothing in this file is built yet.
+Status: second batch closed on 2026-11-24. `results/000-007` records six passes. The hand boot of machine `pc` is `results/000-006`. The following `test-first` is `results/000-008`, eighteen passes. The counter's next id is `000-009`.
 
-Plan 001 closed its first batch on 2026-11-24. `results/000-005` is eighteen passes. The next run id is `000-006`. This plan is the rest of that slice: three failure cases on a work copy, one `pc` boot folder, and the Boot and Base sentences on that machine. It is also the place that records what the first boots changed, so a later reader can see the wrong turns beside the ones that held.
+This file was opened as "ready to implement," and the next sentence said nothing in it was built yet. The harness keys, the six cases, and `images/a-003-pc-base` are built. The sections below stay the original ask. Where a boot made a sentence false, the correction sits next to it.
 
-Writing this down does not build `images/a-003-pc-base`, does not add `test-second`, and does not accept a database format.
+Plan 001 closed its first batch on 2026-11-24. `results/000-005` is eighteen passes. The next run id is `000-006`. This plan is the rest of that slice: three failure cases on a work copy, one `pc` boot folder, and the Boot and Base sentences on that machine. It is also the place that records what the first boots changed, so a later reader can see the wrong turns beside the ones that held. Those three ids were then used here: `000-006` the hand boot, `000-007` the six cases, `000-008` the following first batch.
+
+Writing this down does not build `images/a-003-pc-base`, does not add `test-second`, and does not accept a database format. The folder and the target were built afterwards. The sentence stays so the file shows what writing it down was not allowed to mean. No database format was accepted.
 
 ## 1. Diary
 
@@ -24,7 +26,7 @@ Virtio-scsi was the attachment that worked. ScsiDiskDxe issues Inquiry and publi
 
 The blue device list on the proof boot also offered `EFI Firmware Setup` and `EFI Internal Shell`. The highlighted row was `UEFI QueueOS Boot`.
 
-Plan 001's risk list said that if virtio block were invisible, the response was AHCI: `ich9-ahci` on q35, the machine IDE bus on `pc`, boot indexes kept, vendor and product kept if the fallback firmware would show them. Virtio block was invisible. AHCI was not the thing that made it visible. The fallback stays in section 5 for a later boot whose log shows the firmware never saw a disk. It is not applied in advance. The `pc` machine has not been booted.
+Plan 001's risk list said that if virtio block were invisible, the response was AHCI: `ich9-ahci` on q35, the machine IDE bus on `pc`, boot indexes kept, vendor and product kept if the fallback firmware would show them. Virtio block was invisible. AHCI was not the thing that made it visible. The fallback stays in section 5 for a later boot whose log shows the firmware never saw a disk. It is not applied in advance. The `pc` machine has not been booted. That was true when plan 001 closed. The hand boot is `results/000-006`. Firmware loaded `UEFI QueueOS Boot` from the virtio-scsi disk, Boot counted down, Base counted down, and the device menu returned. `machine.txt` in that run is `pc`. Section 5 was not applied.
 
 ### Ten seconds of menu was a progress bar
 
@@ -98,6 +100,8 @@ annotation=firmware did not hand off to QueueOS-Boot
 ```
 
 `QueueOS loading...` is also the prefix of the failure sentence, so a missing handoff that somehow still printed the failure sentence fails this case too. The 25 second sleep covers the 10 second progress bar and a margin. If the first real log shows our sentence arriving after that sleep, lengthen the sleep and write down why. If the menu or the shell prints our sentence, that is a failure. Do not shorten the expected text to make the case green.
+
+The first log did not ask for a longer sleep, and it did not ask for `current/Boot.efi` to be deleted. `results/000-007/D-003-001` has `BdsDxe: failed to load Boot0002 "UEFI QueueOS Boot "` with `Not Found`, and the same for `UEFI QueueOS Base`. `QueueOS loading...` is absent. The removable-media path was the handoff. `current/Boot.efi` was still on the work copy and was not started.
 
 ### D-003-002 — Boot returns before Base
 
@@ -175,33 +179,34 @@ The database work copy is never mutated.
 
 The first `pc` boot uses the virtio-scsi command already in the harness. Vendor `QueueOS`, products `Boot` and `Base`, boot indexes 1 and 2.
 
-If that boot never prints a Boot line, and the serial log shows the firmware never saw a disk, switch virtio-scsi to the fallback once, for every boot folder, and record the attachment in `tests/README.md`. On q35 the fallback is an `ich9-ahci` controller and two disks. On `pc` it is the machine IDE bus, used the same way. Keep the boot indexes. Keep the vendor and product strings if that firmware will show them. A single invisible `pc` boot is not permission to change q35 if q35 is still drawing the named disks. The fallback is one attachment for the suite only when the same invisibility shows up on the machine that already works. Until a log says the disk was invisible, the command stays virtio-scsi.
+If that boot never prints a Boot line, and the serial log shows the firmware never saw a disk, switch virtio-scsi to the fallback once, for every boot folder, and record the attachment in `tests/README.md`. On q35 the fallback is an `ich9-ahci` controller and two disks. On `pc` it is the machine IDE bus, used the same way. Keep the boot indexes. Keep the vendor and product strings if that firmware will show them. A single invisible `pc` boot is not permission to change q35 if q35 is still drawing the named disks. The fallback is one attachment for the suite only when the same invisibility shows up on the machine that already works. Until a log says the disk was invisible, the command stays virtio-scsi. The hand boot's log shows the firmware saw the disk. The command stayed virtio-scsi for every folder, including the q35 cases that still pass in `results/000-008`.
 
 ## 6. Order of work
 
-1. Teach the harness `mutate`, `annotation`, `forbid`, and `machine.txt`. Keep `mutate=none` working for the eighteen existing cases.
-2. Add `D-003-001`, `D-003-002`, and `D-003-003` against `a-001-q35-base`. Run those three. Adjust the 25 second absence window only from a log that shows why.
-3. Add `images/a-003-pc-base/image.conf` and let the existing image target build it. Add `A-003-001`. Confirm the UEFI bytes match `a-001`.
-4. Boot `pc` once by hand through the harness before declaring the chipset fine. If the disk is invisible, apply section 5 and record it. If the disk is seen, leave the command alone.
-5. Add `D-004-001` and `E-003-001`.
-6. Add `tests/suites/second-batch.list` and the CMake target `test-second`. `cmake/README.md` already says the target waits until `a-003` exists. Add it in this step, with the folder.
-7. Run `test-second` until the six cases pass. Then run `test-first` once so the mutations have not broken the first batch. That second `test-first` consumes a new run id.
-8. Extend `tests/README.md` so it covers both suites, the result directory, the scaffold sentence, and the note that red-pixel calibration was not required. Mention the attachment only if section 5 actually changed it.
-9. Leave `brainstorming/` as exploration. The stub sentences and the ESP-resident Base stay a scaffold in anything this plan writes.
+1. Teach the harness `mutate`, `annotation`, `forbid`, and `machine.txt`. Keep `mutate=none` working for the eighteen existing cases. Done. The mutation is `tests/harness/mutate.sh`. `tools/mkimage.c` was not grown. The eighteen cases passed again in `results/000-008`, and their `machine.txt` values are `q35`.
+2. Add `D-003-001`, `D-003-002`, and `D-003-003` against `a-001-q35-base`. Run those three. Adjust the 25 second absence window only from a log that shows why. Done. The window held. See section 3.
+3. Add `images/a-003-pc-base/image.conf` and let the existing image target build it. Add `A-003-001`. Confirm the UEFI bytes match `a-001`. Done. The folder scan picked the conf up. The qcow2 files compare equal.
+4. Boot `pc` once by hand through the harness before declaring the chipset fine. If the disk is invisible, apply section 5 and record it. If the disk is seen, leave the command alone. Done. `results/000-006`. The disk was seen. The command was left alone.
+5. Add `D-004-001` and `E-003-001`. Done.
+6. Add `tests/suites/second-batch.list` and the CMake target `test-second`. `cmake/README.md` already says the target waits until `a-003` exists. Add it in this step, with the folder. Done. The README names the target.
+7. Run `test-second` until the six cases pass. Then run `test-first` once so the mutations have not broken the first batch. That second `test-first` consumes a new run id. Done. `000-007`, then `000-008`.
+8. Extend `tests/README.md` so it covers both suites, the result directory, the scaffold sentence, and the note that red-pixel calibration was not required. Mention the attachment only if section 5 actually changed it. Done. The attachment sentence was left as virtio-scsi.
+9. Leave `brainstorming/` as exploration. The stub sentences and the ESP-resident Base stay a scaffold in anything this plan writes. Done. `brainstorming/` was not edited.
 
 `tq all` is unchanged. `test-second` is the door for this list.
 
 ## 7. Done when
 
-- `test-second` exits 0 and the summary shows the six cases passed.
-- A following `test-first` exits 0.
-- The case mutations do not change `images/`. The `a-001` UEFI manifest still matches.
-- `a-003`'s UEFI qcow2 matches `a-001`'s byte for byte.
-- `machine.txt` for the two `pc` boots is `pc`.
-- The database image is still blank. No header, generation, or boot-success flag was written.
-- `a-003` has no `vm.conf`.
-- The failure cases do not set red on red. That is a property of `boot.c` and `boot-fail.c`, and this plan does not "fix" the failure path to hide firmware text.
-- The host `OVMF_VARS.fd` and `/mnt/speedy/500_VMs/QueueOS-a-001/OVMF_VARS.fd` are not written by these runs. Check the mtime after the suite. Do not trust a mtime copied into this file.
+Met on this machine:
+
+- `results/000-007/summary.txt` shows the six cases passed. `test-second` exited 0.
+- `results/000-008/summary.txt` shows the eighteen first-batch cases passed.
+- The `a-001` UEFI qcow2 hash is still `d9261692d561b8ea7bf29a710e83353eb140ae64aa7625825133cfff139be84b`, and `A-001-001` in `000-008` passed. `a-003`'s UEFI qcow2 compares equal to that file.
+- `machine.txt` for `D-004-001` and `E-003-001` is `pc`.
+- `A-001-002` in `000-008` still sees a blank database image. The database qcow2 hash is still `1b7af784841125887e688254229e282829e17245d0e47fe7280da9b68a30d9e1`. No header, generation, or boot-success flag was written.
+- `images/a-003-pc-base/vm.conf` is absent. `A-003-001` fails if that file appears.
+- `boot.c` and `boot-fail.c` were not edited. `D-003-002` and `D-003-003` both leave the firmware `Load Error` line in `serial.log`.
+- After these runs the host `OVMF_VARS.fd` target is 131072 bytes with mtime `2026-10-25 17:00:00 -0700`. `/mnt/speedy/500_VMs/QueueOS-a-001/OVMF_VARS.fd` is 131072 bytes with mtime `2026-11-24 17:59:39 -0700`, the stamp plan 001 already recorded, checked again against the file. The domain stayed shut off. The image build said the guest copies already matched, and it did not replace them.
 
 ## 8. Already paid for
 
