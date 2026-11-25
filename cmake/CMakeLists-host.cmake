@@ -18,6 +18,12 @@ target_compile_options(sentences PRIVATE -Wall -Wextra -Werror)
 
 add_test(NAME sentences COMMAND sentences)
 
+# Host stand-in for the Boot list. It reads sample slots and does not boot.
+add_test(
+    NAME boot-tui
+    COMMAND lua "${CMAKE_SOURCE_DIR}/tests/boot-tui.lua" --check
+)
+
 # Host build tools. pe-reloc repairs the EFI image after objcopy.
 # mkimage writes the GPT and calls mkfs.fat, mtools, and qemu-img.
 # Both are C. The checks that ctest runs are Bash.

@@ -83,4 +83,25 @@ The working method is description. He sets direction, takes risks, and expects t
 
 - The letter assignment beyond the first slice. `plans/001-harness-and-stubs.md` adopts the working assumption for its own batches: A checks image files, the red-screen Boot check is a D test, and Base's `QueueOS Loaded` line is an E test. Further letters and the general scheme stay open.
 
+## Proposals added 2026-11-25
+
+Status: proposal. These notes are the interview. They are not the plan. Plan 003 was marked ready on 2026-11-25 and is the slice that builds them. Where the plan and these notes differ, the plan is the one to build.
+
+- The database disk has no filesystem. Ten 4 KiB slots sit at the start. Slot 1 is byte 0. Each slot is a JSON object, then a newline, then a line `sha256` and 64 lowercase hex digits. The hash is of the JSON bytes only, so it does not depend on key order. The rest of the slot is zeros. An empty slot is `{}` and a matching hash. Pictures stay out of the slot.
+- `"OS":"QueueOS"` is a sanity check, not a secret. A generation also carries a name, a version, a publication timestamp, and pointers to binaries. A pointer has a role, an architecture, a byte offset from the start of the disk, a length, a sha256, and a `"file"` label such as `Base.efi`. The label is for the Explore view. It is not a path. This disk has no directories. The same bytes can be shared by more than one slot, and they share that label.
+- If the JSON parses and the hash matches and OS is QueueOS, the slot is a candidate. If it parses and the hash does not match, the list shows UNSAFE and Boot does not start it. If it is not JSON, skip it as unreadable. `{}` with a good hash is empty. A good hash with some other OS is not a QueueOS generation.
+- The list shows all ten slots, in slot order. The framed QueueOS mark is centered at the top of one stack, the slots sit in the middle in a column the width of that mark, and Explore and Launch sit under the list. Spare rows and columns center the whole stack. A terminal too small for the frame uses the one-line word and scrolls the slots. The mouse selects a row. The first selection is the newest launchable candidate by publication timestamp, or slot 1 when none can launch. If that row can launch and there is no keyboard or mouse activity, a 10 second timer launches it. Activity starts the 10 seconds over. Explore pauses the timer. An UNSAFE or empty row is not what the timer starts.
+- Explore replaces the list with a scrollable pretty view of that slot's JSON, and replaces the buttons with Back. The pretty view is not written back. Editing waits.
+- Automatic boot uses the newest candidate that names a Base for this machine. The architecture token is the one this Boot was built for, `x86-64` on the first image. There is no UEFI call that answers the question. The same token is what a later non-UEFI Boot would use.
+- After the ten slots, the binaries live in a range whose size can be tuned later. The database body stays past that range so later body bytes do not slide when a Base or a picture is added. The first image leaves that body empty and puts one x86-64 Base in the boot range. Pictures are blob entries with role `thumbnail`, legal and absent for now. They are not base64 inside the JSON. UPX is out of this conversation.
+- The writer, later, reads all ten slots, gathers the binaries still named, and rewrites that set. An identical sha256 reuses one copy. New bytes go in a free gap or at the end of the boot range. Offsets a slot still names stay put. If nothing fits, the publish stops. A reorg happens only when requested, and it does not move the body. Replacing the oldest slot drops that record. The next rewrite can drop binaries nobody names. Do not overwrite the only good generation in place before the new slot is committed.
+- Boot links Lua and Jansson into the executable. Nothing is loaded at runtime. Jansson reads the ten slots. Lua draws the list, runs the timer, and pretty-prints Explore. The firmware has no libc, so malloc and free have to be the UEFI pool. That heap is not part of the host screen.
+- For trying the screen, a host program runs the same list against a disk image and does not launch Base. A qcow2 is converted to a temporary raw file, which is the byte layout Boot sees. `lua tests/boot-tui.lua` with no image shows ten empty slots. Launch prints the chosen Base and returns. The firmware Boot is still the ESP scaffold.
+
+## Decided 2026-11-25
+
+Status: accepted for the publisher. Plan 003 was marked ready on 2026-11-25. `plans/003-slots-and-publisher.md` is the active slice. Nothing in it is built.
+
+- When a publish would overwrite the oldest slot, and that slot is the only one that has completed a boot, the publisher leaves it and overwrites the oldest of the other slots. Once a newer slot has also completed a boot, the older one can be overwritten like any other record. Empty, unreadable, foreign, and UNSAFE slots are used before a candidate is dropped. The timer still does not start an UNSAFE row. That rule was already separate from this one.
+
 
