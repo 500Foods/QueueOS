@@ -67,19 +67,29 @@ While this project is currently under active development, feel free to give it a
 [![Count Lines of Code](https://github.com/500Foods/QueueOS/actions/workflows/main.yml/badge.svg)](https://github.com/500Foods/QueueOS/actions/workflows/main.yml)
 <!--CLOC-START -->
 ```cloc
-Last updated at 2026-11-24 20:57:34 UTC
+Last updated at 2026-11-24 22:18:22 UTC
 -------------------------------------------------------------------------------
 Language                     files          blank        comment           code
 -------------------------------------------------------------------------------
-Markdown                        19           2619              2           4840
-Lua                              1             39             41            430
+Markdown                        23           2660              2           4914
+C                               11            457            271           4012
+C/C++ Header                     7            252            274           1753
+Lua                              2             54             64            607
+Bourne Shell                     3             33             15            295
+CMake                            7             31             40            152
 YAML                             2              8             13             37
+Text                             1              4              0             17
 -------------------------------------------------------------------------------
-SUM:                            22           2666             56           5307
+SUM:                            56           3499            679          11787
 -------------------------------------------------------------------------------
-2 Files were skipped (duplicate, binary, or without source code):
+10 Files were skipped (duplicate, binary, or without source code):
+  sha256: 3
+  conf: 2
+  current: 1
   gitattributes: 1
   gitignore: 1
+  lds: 1
+  version: 1
 ```
 <!--CLOC-END-->
 
