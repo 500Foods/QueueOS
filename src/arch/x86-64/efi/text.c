@@ -31,7 +31,7 @@ static void queueos_to_char16(const char *text, QUEUEOS_CHAR16 *out, QUEUEOS_UIN
     out[i] = 0;
 }
 
-static void queueos_screen_write(QUEUEOS_EFI_SYSTEM_TABLE *system, const char *sentence)
+void queueos_screen_show(QUEUEOS_EFI_SYSTEM_TABLE *system, const char *sentence)
 {
     QUEUEOS_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *out;
     QUEUEOS_CHAR16 wide[QUEUEOS_TEXT_MAX];
@@ -49,10 +49,24 @@ static void queueos_screen_write(QUEUEOS_EFI_SYSTEM_TABLE *system, const char *s
     out->output_string(out, wide);
 }
 
+void queueos_screen_attribute(QUEUEOS_EFI_SYSTEM_TABLE *system, QUEUEOS_UINTN attribute)
+{
+    QUEUEOS_EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *out;
+
+    if (system == 0 || system->con_out == 0) {
+        return;
+    }
+    out = system->con_out;
+    if (out->set_attribute == 0) {
+        return;
+    }
+    out->set_attribute(out, attribute);
+}
+
 void queueos_report(QUEUEOS_EFI_SYSTEM_TABLE *system, const char *diagnostic, const char *sentence)
 {
     queueos_serial_init();
     queueos_serial_write_line(diagnostic);
-    queueos_screen_write(system, sentence);
+    queueos_screen_show(system, sentence);
     queueos_serial_write_line(sentence);
 }

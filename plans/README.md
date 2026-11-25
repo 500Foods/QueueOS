@@ -8,4 +8,5 @@ A plan describes a slice of work that is ready to build: what is in scope, what 
 
 Plans are added as separate documents when a slice of work is ready to implement.
 
-- [001 — Harness and stubs](001-harness-and-stubs.md). The first plan. It covers the QEMU test harness, the two disk files, and the trivial Boot and Base programs. Later subsystems stay listed there as out of scope.
+- [001 — Harness and stubs](001-harness-and-stubs.md). The first plan. First batch closed: the QEMU harness, the two disk files, and the trivial Boot and Base programs. The record keeps the original ask, with corrections beside the sentences the boots made false.
+- [002 — Second batch](002-second-batch.md). Ready to build, not built. Six cases: three ESP mutations on a work copy, the `pc` boot folder, and the Boot and Base sentences on that machine. It is also the diary of what plan 001 got wrong.

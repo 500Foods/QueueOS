@@ -11,6 +11,10 @@
  * specified to be FAT32.
  *
  * usage: mkimage --root DIR --build DIR
+ *
+ * A boot folder may include vm.conf. That names a local guest copy
+ * to refresh after the images are written. Folders without the file
+ * are left alone.
  */
 
 #define _XOPEN_SOURCE 700
@@ -19,6 +23,7 @@
 
 #include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <ftw.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -674,6 +679,242 @@ static void write_boot_image(const char *folder, const char *name, const char *r
     printf("%s: UEFI image, database -> %s\n", name, relative);
 }
 
+/* vm.conf sits beside image.conf. It names a local Virtual Machine
+ * Manager guest whose disk copies should track this folder. The
+ * builder does not define that guest. OVMF_VARS.fd in the directory
+ * is firmware NVRAM, so only the two qcow2 files are copied, and only
+ * when their bytes differ. The database source is the resolved
+ * symlink target. Copying the symlink itself would store a path that
+ * is relative to images/ and wrong under the guest directory.
+ *
+ * A missing vm.conf means this folder has no guest copy. A missing
+ * directory is one line and not a build failure, so another checkout
+ * still builds. A present file without name or directory is an error.
+ * The copy runs when virsh reports "shut off", and when virsh cannot
+ * see the domain. Any other state leaves the files alone.
+ */
+
+struct vm_conf {
+    char name[256];
+    char directory[QPATH];
+};
+
+static void trim_ends(char *s)
+{
+    char *end;
+    size_t lead = 0;
+
+    while (s[lead] == ' ' || s[lead] == '\t')
+        lead++;
+    if (lead > 0)
+        memmove(s, s + lead, strlen(s + lead) + 1);
+    end = s + strlen(s);
+    while (end > s && (end[-1] == '\n' || end[-1] == '\r' ||
+                       end[-1] == ' ' || end[-1] == '\t'))
+        *--end = '\0';
+}
+
+static void copy_value(char *dst, size_t dst_sz, const char *src, const char *what)
+{
+    size_t n = strlen(src);
+
+    if (n == 0 || n + 1 > dst_sz)
+        die(what);
+    memcpy(dst, src, n + 1);
+}
+
+/* 1 when the folder names a guest copy. 0 when vm.conf is absent. */
+static int read_vm_conf(const char *folder, struct vm_conf *vm)
+{
+    char path[QPATH];
+    FILE *fp;
+    char line[QPATH];
+    int saw_name = 0;
+    int saw_dir = 0;
+
+    path_join(path, sizeof path, folder, "vm.conf");
+    fp = fopen(path, "r");
+    if (!fp) {
+        if (errno == ENOENT)
+            return 0;
+        die_errno(path);
+    }
+    memset(vm, 0, sizeof *vm);
+    while (fgets(line, sizeof line, fp) != NULL) {
+        char *eq;
+        if (strchr(line, '\n') == NULL && !feof(fp))
+            die("vm.conf line is too long");
+        trim_ends(line);
+        if (line[0] == '\0' || line[0] == '#')
+            continue;
+        eq = strchr(line, '=');
+        if (!eq)
+            die("vm.conf: expected name=value");
+        *eq = '\0';
+        trim_ends(line);
+        trim_ends(eq + 1);
+        if (strcmp(line, "name") == 0) {
+            copy_value(vm->name, sizeof vm->name, eq + 1,
+                       "vm.conf name is empty or too long");
+            saw_name = 1;
+        } else if (strcmp(line, "directory") == 0) {
+            copy_value(vm->directory, sizeof vm->directory, eq + 1,
+                       "vm.conf directory is empty or too long");
+            saw_dir = 1;
+        } else {
+            die("vm.conf: unknown key");
+        }
+    }
+    if (ferror(fp))
+        die_errno(path);
+    fclose(fp);
+    if (!saw_name || !saw_dir)
+        die("vm.conf needs name and directory");
+    return 1;
+}
+
+static void read_all_text(int fd, char *out, size_t out_sz)
+{
+    size_t got = 0;
+    char sink[256];
+
+    if (out_sz == 0)
+        die("vm state buffer");
+    for (;;) {
+        ssize_t n;
+        if (got + 1 < out_sz)
+            n = read(fd, out + got, out_sz - 1 - got);
+        else
+            n = read(fd, sink, sizeof sink);
+        if (n < 0) {
+            if (errno == EINTR)
+                continue;
+            die_errno("virsh");
+        }
+        if (n == 0)
+            break;
+        if (got + 1 < out_sz)
+            got += (size_t)n;
+    }
+    out[got] = '\0';
+}
+
+static void keep_first_line(char *s)
+{
+    char *nl = strpbrk(s, "\r\n");
+
+    if (nl)
+        *nl = '\0';
+    trim_ends(s);
+}
+
+/* 1 when the copies may be replaced. virsh failure counts as allowed:
+ * the domain is undefined here, or virsh is not installed. */
+static int guest_allows_refresh(const char *domain, char *state, size_t state_sz)
+{
+    int fds[2];
+    pid_t pid;
+    int status;
+    char *argv[] = {
+        "virsh", "-c", "qemu:///system", "domstate", (char *)domain, NULL
+    };
+
+    state[0] = '\0';
+    if (pipe(fds) != 0)
+        die_errno("pipe");
+    pid = fork();
+    if (pid < 0)
+        die_errno("fork");
+    if (pid == 0) {
+        int devnull;
+        if (dup2(fds[1], STDOUT_FILENO) < 0)
+            _exit(127);
+        close(fds[0]);
+        close(fds[1]);
+        devnull = open("/dev/null", O_WRONLY);
+        if (devnull >= 0) {
+            dup2(devnull, STDERR_FILENO);
+            close(devnull);
+        }
+        execvp(argv[0], argv);
+        _exit(127);
+    }
+    close(fds[1]);
+    read_all_text(fds[0], state, state_sz);
+    close(fds[0]);
+    if (waitpid(pid, &status, 0) < 0)
+        die_errno("waitpid");
+    keep_first_line(state);
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
+        return 1;
+    return strcmp(state, "shut off") == 0;
+}
+
+static void refresh_disk(const char *folder_name, const char *src,
+                         const char *dir, const char *file)
+{
+    char dest[QPATH];
+    char tmp[QPATH];
+    char src_hex[65];
+    char dst_hex[65];
+
+    path_join(dest, sizeof dest, dir, file);
+    if (queueos_sha256_file(src, src_hex) != 0)
+        die_errno(src);
+    dst_hex[0] = '\0';
+    if (queueos_sha256_file(dest, dst_hex) == 0) {
+        if (strcmp(src_hex, dst_hex) == 0) {
+            printf("%s: %s already matches\n", folder_name, file);
+            return;
+        }
+    } else if (errno != ENOENT) {
+        die_errno(dest);
+    }
+    if (snprintf(tmp, sizeof tmp, "%s.tmp", dest) >= (int)sizeof tmp)
+        die("path is too long");
+    copy_file(src, tmp);
+    if (rename(tmp, dest) != 0) {
+        int saved = errno;
+        unlink(tmp);
+        errno = saved;
+        die_errno(dest);
+    }
+    printf("%s: %s refreshed\n", folder_name, file);
+}
+
+static void refresh_vm_copy(const char *folder, const char *folder_name)
+{
+    struct vm_conf vm;
+    struct stat st;
+    char state[128];
+    char link[QPATH];
+    char resolved[QPATH];
+    char uefi[QPATH];
+
+    if (!read_vm_conf(folder, &vm))
+        return;
+    if (stat(vm.directory, &st) != 0) {
+        if (errno == ENOENT || errno == ENOTDIR) {
+            printf("%s: vm directory is not on this machine\n", folder_name);
+            return;
+        }
+        die_errno(vm.directory);
+    }
+    if (!S_ISDIR(st.st_mode))
+        die("vm.conf directory is not a directory");
+    if (!guest_allows_refresh(vm.name, state, sizeof state)) {
+        printf("%s: guest \"%s\" is %s; left the copies\n",
+               folder_name, vm.name, state[0] ? state : "not shut off");
+        return;
+    }
+    path_join(uefi, sizeof uefi, folder, "QueueOS-UEFI.qcow2");
+    refresh_disk(folder_name, uefi, vm.directory, "QueueOS-UEFI.qcow2");
+    path_join(link, sizeof link, folder, "QueueOS-Database.qcow2");
+    if (realpath(link, resolved) == NULL)
+        die_errno(link);
+    refresh_disk(folder_name, resolved, vm.directory, "QueueOS-Database.qcow2");
+}
+
 int main(int argc, char **argv)
 {
     const char *root = NULL;
@@ -737,6 +978,7 @@ int main(int argc, char **argv)
         char folder[QPATH];
         path_join(folder, sizeof folder, images, folders[i]);
         write_boot_image(folder, folders[i], raw, stage, version);
+        refresh_vm_copy(folder, folders[i]);
         free(folders[i]);
     }
     return 0;

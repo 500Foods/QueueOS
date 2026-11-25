@@ -108,9 +108,15 @@ Agreement is less important than technical correctness and architectural consist
 
 ### 3.4 Document significant changes
 
-Significant architectural decisions should be recorded in the appropriate documentation under `docs/`.
+Record a change in the place that already holds that kind of information.
 
-Changes to established interfaces, storage formats, execution models or security boundaries should receive particular attention.
+- `brainstorming/` is exploration. A note there does not accept a decision.
+- `plans/interview-log.md` holds the design interview. Each note carries a status from section 3.2.
+- `plans/` holds implementation plans. A plan states the slice to build, what is deferred, the order of the work, and how the result is validated. Plans are a diary. When a slice is finished, correct that plan's record and move unfinished work into the next plan. Leave the earlier mistakes in the record.
+- `plans/README.md` names the plan that is ready to build. That plan is the active slice. One plan is ready at a time. Interview notes for the following plan go in the interview log while the active plan is open. They do not change the active plan's scope, and they do not start the following plan's code. Mark the following plan ready only after the active plan is closed.
+- `docs/` is reserved for an accepted architecture manual. The directory has no manual yet. Create a page there when an accepted design needs one. Copying `brainstorming/` or the interview log into `docs/` does not accept those notes.
+
+Changes to established interfaces, storage formats, execution models, or security boundaries are recorded in the active plan and, once accepted, in that manual.
 
 ## 4. Development Practices
 
@@ -118,7 +124,7 @@ Changes to established interfaces, storage formats, execution models or security
 
 Before implementing a feature:
 
-1. Read the relevant architectural documentation.
+1. Read `plans/README.md` and the active plan. Read `plans/interview-log.md` for the status of decisions that plan depends on. Then read the code and interfaces the plan names. Treat `brainstorming/` as exploration. `docs/` has no manual yet.
 2. Examine existing implementations and interfaces.
 3. Identify dependencies and affected components.
 4. Understand existing conventions.
@@ -233,7 +239,7 @@ Do not introduce arbitrary coding standards that conflict with the existing impl
 
 Documentation is part of the implementation.
 
-When changing functionality, update the relevant documentation.
+When changing functionality, update the relevant documentation. That is the active plan, the interview log when a status changes, and `docs/` once an accepted manual exists. Section 3.4 names those places.
 
 When introducing a new component, explain its responsibilities, interfaces and dependencies.
 
@@ -267,6 +273,8 @@ When multiple implementation approaches are possible, explain the trade-offs rat
 
 The immediate development priority is establishing and validating the fundamental QueueOS architecture.
 
+The active slice is the plan `plans/README.md` marks ready to build. Finish that slice before writing the next plan's code. Interview notes taken along the way land in `plans/interview-log.md` and wait there.
+
 Avoid premature feature expansion.
 
 Prioritize foundational functionality, clearly defined interfaces and repeatable testing.
@@ -297,7 +305,7 @@ The test harness and the host checks are Bash. A check that `ctest` runs, and th
 
 Host programs that build artifacts are C. The image builder and the PE relocation tool are host C programs. They may execute existing system tools such as `mkfs.fat`, `mmd`, `mcopy`, and `qemu-img`.
 
-`tests/test-queueos.lua` is the interactive catalogue. It is Lua. It lists cases and does not launch QEMU. It stays Lua.
+`tests/test-queueos.lua` is the interactive catalogue. It is Lua. With no arguments it lists cases. `all` calls the Bash harness in `tests/harness/run.sh`. The Lua file does not contain a QEMU command line. It stays Lua.
 
 ### 11.3 Source file length
 

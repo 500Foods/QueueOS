@@ -5,9 +5,8 @@
 --
 -- No arguments, on a terminal, opens a full-screen list: each case, the
 -- last run that recorded it, and that run's result. `all` is reserved for
--- running every case. This file does not launch QEMU. The harness in
--- tests/harness/run.sh is a later step, and this catalogue will not invent
--- a command line for it.
+-- running every case. `all` calls tests/harness/run.sh on the first batch.
+-- This file still does not build a QEMU command of its own.
 --
 -- The screen uses terminal.lua, the same library Hydrogen's SchemaHelper
 -- uses. Lua 5.5 is the interpreter. The module is installed with luarocks
@@ -156,12 +155,25 @@ local function usage(stream)
     stream:write(USAGE)
 end
 
-local function run_all(tests)
+local function run_all(root, tests)
     if #tests == 0 then
         io.stdout:write("No tests to run.\n")
         return 0
     end
-    io.stderr:write("Cannot run tests yet. The harness is a later step.\n")
+    local harness = root .. "/tests/harness/run.sh"
+    local handle = io.open(harness, "r")
+    if not handle then
+        io.stderr:write("Cannot run tests yet. The harness is a later step.\n")
+        return 1
+    end
+    handle:close()
+    local cmd = "bash " .. sh_quote(harness)
+        .. " --root " .. sh_quote(root)
+        .. " --build " .. sh_quote(root .. "/build")
+        .. " --suite " .. sh_quote(root .. "/tests/suites/first-batch.list")
+    if os.execute(cmd) == true then
+        return 0
+    end
     return 1
 end
 
@@ -653,7 +665,7 @@ local function main()
     clamp(app)
 
     if command == "all" then
-        return run_all(app.tests)
+        return run_all(app.root, app.tests)
     end
     if not stdout_is_tty() then
         plain_list(app.tests, app.version)

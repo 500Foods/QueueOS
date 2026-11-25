@@ -30,7 +30,7 @@ QueueOS is being designed as a collection of cooperating components, with partic
 - Security and authorization
 - Installation, upgrades and recovery
 
-See the [`docs/`](docs/README.md) directory for architectural documentation and implementation planning.
+Architectural exploration is in [`brainstorming/`](brainstorming/). Implementation plans are in [`plans/`](plans/README.md).
 
 ## Development Status
 

@@ -1,8 +1,10 @@
 # 001 — Harness and stubs
 
-Status: ready to implement. This is the first implementation plan.
+Status: first batch closed on 2026-11-24. `results/000-005` records eighteen passes. The second batch moved to [002 — Second batch](002-second-batch.md).
 
-The boot disks live under `images/`, one folder per bootable system, as section 4 describes. `tests/test-queueos.lua` is the interactive catalogue in section 7. The stubs, the image builder, and the harness are not built yet.
+This file was opened as "ready to implement," and the next sentence said the stubs, the image builder, and the harness were not built yet. They are built. The sections below stay the original ask. Where a boot or a language rule made a sentence false, the correction sits next to it. The file is not rewritten to look as if those corrections were known on the first draft.
+
+The boot disks live under `images/`, one folder per bootable system, as section 4 describes. `tests/test-queueos.lua` is the interactive catalogue in section 7.
 
 The decision record stays in [interview-log.md](interview-log.md). This file says what to build for the first test batches, what those batches hold constant, and what they leave alone. Writing it down does not close a deferred experiment, and it does not turn a proposal into an accepted decision.
 
@@ -50,7 +52,7 @@ The following stay where the interview log put them. This slice must not invent 
 - QueueOS-Desktop, QueueOS-Console, QueueOS-MCP, QueueOS-Remote, and the display manager. MCP is the likely first session the harness will use to drive Base, and that is an F plan.
 - Cluster trust, version sharing, application placement, and Desktop crash handling.
 - AArch64 guests and physical hardware. The harness should be shaped so a later folder can name different firmware and a different QEMU binary. This plan does not require those runs to pass.
-- README's "give it a try" tone, the link to a `docs/` tree that is not in the repository, and the CLOC workflow that rewrites README. Leave them for a separate cleanup.
+- README's "give it a try" tone, and the CLOC workflow that rewrites README. Leave those. The README used to link to `docs/README.md` while `docs/` was an empty directory. That sentence now points at `brainstorming/` and `plans/`. An architecture manual waits until an accepted design has somewhere to live. The CLOC badge counts Markdown and Lua and skips the C sources.
 
 ## 4. The image folders
 
@@ -73,7 +75,7 @@ images/
     manifest.sha256
     QueueOS-UEFI.qcow2
     QueueOS-Database.qcow2          same kind of symlink
-  a-003-pc-base/
+  a-003-pc-base/                  plan 002; the folder does not exist yet
     image.conf
     manifest.sha256
     QueueOS-UEFI.qcow2
@@ -94,7 +96,7 @@ images/
 | `firmware-code` | `/usr/share/OVMF/OVMF_CODE.fd` | the same path | the same path |
 | `firmware-vars` | `/usr/share/OVMF/OVMF_VARS.fd` | the same path | the same path |
 
-`a-001-q35-base` and `a-002-q35-serial` are the first batch. `a-003-pc-base` is the second batch. The three UEFI disks in this slice are the same ESP bytes, written from one staged tree, so a later change to one folder does not have to touch the others. `a-003-pc-base` is the `pc` machine. It is not package `A-002`, and `a-002-q35-serial` is not that package either.
+`a-001-q35-base` and `a-002-q35-serial` are the first batch, and those folders exist. `a-003-pc-base` is drawn in the tree above and was not created here. Plan 002 creates it, and its UEFI disk is the same staged ESP bytes as the other two. `a-003-pc-base` is the `pc` machine. It is not package `A-002`, and `a-002-q35-serial` is not that package either.
 
 The symlink `QueueOS-Database.qcow2` is a build product. `*.qcow2` is ignored, so the builder recreates the symlink and Git does not store it. The harness resolves the symlink and copies the target bytes into the run's `work/` directory. QEMU never opens the file under `images/`.
 
@@ -123,6 +125,8 @@ EFI/QueueOS/rescue/RESCUE
 Nothing in the image programs NVRAM `Boot####` entries. Building that order is the updater plan.
 
 The image builder is the host C program `tools/mkimage.c`, run from CMake. It must work without root. `losetup`, `qemu-nbd`, and `kpartx` are on this machine and still need privileges, so they are not the path. The program writes the GPT itself, formats the partition with `mkfs.fat -F 32 -s 1 --invariant`, and copies files with mtools (`mmd`, `mcopy`, using the `@@` byte-offset syntax against the raw image). `-s 1` is 512-byte clusters, so this 64 MiB disk has enough clusters for FAT32. `--invariant` freezes the volume id. mtools still writes the clock into directory entries, and the program clears those fields so a second build matches the first. `qemu-img convert -O qcow2` writes each boot folder's UEFI image. `qemu-img create -f qcow2` writes the blank database image for the version named by `current`. The program then creates each boot folder's database symlink. Intermediate raw files stay under `build/` and are already ignored.
+
+A boot folder may also carry `vm.conf`. The file is optional. It names a local Virtual Machine Manager copy that should track that folder, and folders without it are left alone. `a-001-q35-base` has one. Later folders get one only when a guest is added for them. The keys are `name` (the libvirt domain on `qemu:///system`) and `directory` (the folder that holds the guest's disk copies). After writing the images, the builder refreshes `QueueOS-UEFI.qcow2` and `QueueOS-Database.qcow2` in that directory. The database copy is the resolved symlink target. Bytes that already match are left untouched. `OVMF_VARS.fd` is guest NVRAM and is not refreshed. The builder does not define the domain. It copies when `virsh` reports `shut off`, and when `virsh` cannot see the domain. Any other domain state leaves the copies in place and does not fail the build. A missing directory prints one line and does not fail the build. A `vm.conf` that is present but missing `name` or `directory` fails the build.
 
 Each boot folder's `manifest.sha256` lists the sha256 of that folder's UEFI qcow2 and of the four ESP payloads `BOOTX64.EFI`, `current/Boot.efi`, `current/Base.efi`, and `rescue/Boot.efi`. `images/database/<version>/manifest.sha256` lists the sha256 of that version's database qcow2. A-001 checks the `a-001-q35-base` manifest and the database version that folder resolves. It does not repeat those checks for `a-002-q35-serial`.
 
@@ -177,7 +181,9 @@ On entry, each program:
 
 The serial device is the 16550 at I/O port `0x3F8`, 115200 8N1, which is QEMU's default UART. Initialize it from the stub. Wait for the transmit-holding-register-empty bit before each byte. Firmware's text protocol is CHAR16 and does not write these ASCII lines to that UART. The explicit port writes are what `serial.log` contains.
 
-Boot then starts Base as section 5 describes. On success it writes `QueueOS-Boot: base started` after `StartImage` returns. On failure it writes the failure sentence and returns an error. Base, after its sentence, writes `QueueOS-Base: ready` and then stalls about five seconds so a person running the `run` target can see the screen. The harness does not use that stall as a timer. It quits QEMU itself once the serial line it is waiting for has arrived.
+Boot then holds its screen for ten seconds before it starts Base. Each second it redraws `QueueOS loading...` and the remaining count, and it writes `QueueOS-Boot: countdown N` on the serial line. The loading sentence itself is already on the serial line before the first count, so a case that is waiting for that sentence does not sit through the countdown. On success Boot writes `QueueOS-Boot: base started` after `StartImage` returns, then sets the console attribute to red on red (`0x04 | 0x40`) without clearing. On failure it writes the failure sentence and returns an error, and it does not change the attribute, so the loading sentence stays visible. Base, after its sentence, writes `QueueOS-Base: ready`, then counts down from 10 the same way Boot does (`QueueOS-Base: countdown N` on the serial line, the sentence and the count on screen). It then sets the same red-on-red attribute. The Loaded sentence was already drawn in white and is left in place. The harness does not use either pause as a timer. It quits QEMU itself once the serial line it is waiting for has arrived.
+
+After Base and Boot both return, firmware draws its own boot-device menu, including the line `Please select boot device:`. Before that menu sets its own colors, firmware may print a line with whatever attribute QueueOS left behind. Red on red makes that line the same color as the field. The menu then sets its own colors and stays visible. That menu waits for a key. It is not a QueueOS shutdown sentence, and QueueOS has already returned, so the stubs cannot pause it. The headless `run` target keeps the serial log through that line and saves a screenshot of the menu. A catalogue case still stops at the sentence it is checking. The serial log still contains the firmware line. The attribute only changes how the screen draws it.
 
 `current/Base.efi` must be smaller than 500 KiB. The stub will be far smaller. The check is a tripwire for the accepted limit.
 
@@ -200,7 +206,7 @@ tools/mkimage.c
 tools/host-hash.c
 ```
 
-`boot-fail.c` is built only for the second batch. It prints the Boot sentence and returns `EFI_LOAD_ERROR` without calling `LoadImage`.
+`boot-fail.c` prints the Boot sentence and returns `EFI_LOAD_ERROR` without calling `LoadImage`. It was built with the first EFI targets so `efi-headers` could see three PE files. No first-batch case installs it. Plan 002 is what copies it onto a run's work disk.
 
 ## 7. Repository layout this slice adds
 
@@ -213,8 +219,8 @@ tools/pe-reloc.c             PE base relocations
 tools/host-hash.c            crc32 and sha256 for the image builder
 images/database/current      tracked pointer, first line 0001
 images/a-001-q35-base/image.conf
+images/a-001-q35-base/vm.conf    optional local guest copy
 images/a-002-q35-serial/image.conf
-images/a-003-pc-base/image.conf
 vendored/unity/              stock ThrowTheSwitch Unity, plus VERSION
 tests/test-queueos.lua       interactive catalogue
 tests/tq-mouse.lua
@@ -223,12 +229,11 @@ tests/host/                  Unity sentence runner and Bash checks
 tests/harness/run.sh
 tests/cases/                 one directory per case, each with case.conf
 tests/suites/first-batch.list
-tests/suites/second-batch.list
 build/                       generated, already gitignored
 results/                     generated, gitignored
 ```
 
-`/results/` is ignored. `*.qcow2` is already ignored. The qcow2 files and the database symlinks are build products under `images/`. `image.conf` and `images/database/current` are tracked. Do not negate the qcow2 rule to check disk images in.
+`/results/` is ignored. `*.qcow2` is already ignored. The qcow2 files and the database symlinks are build products under `images/`. `image.conf`, an optional `vm.conf`, and `images/database/current` are tracked. Do not negate the qcow2 rule to check disk images in.
 
 `tests/test-queueos.lua` is the catalogue a person opens. It runs on Lua 5.5 and uses terminal.lua 0.1.0, the library Hydrogen's SchemaHelper uses. The script asks `luarocks --lua-version=5.5 path` for the module path, so the alias does not have to export `LUA_PATH`. The alias itself stays in the user's shell: `alias tq='lua /mnt/extra/Projects/QueueOS/tests/test-queueos.lua'`.
 
@@ -236,7 +241,7 @@ With no arguments, on a terminal, it opens one full-screen list. The background 
 
 Each row is a case directory `tests/cases/<id>/` that contains `case.conf`. The row shows the directory name, the `title=` line, the last run, and the result. The last run is the highest `results/<run>/<id>/` whose `meta.txt` exists. The result is that file's `result=` line, `pass` or `fail`. A case that has never run shows `none`. No cases yet: the screen says so. Up and down move the selection, Page Up and Page Down move a page, `r` rescans, `q` or Esc quits. Ctrl-C quits too. The screen does not start QEMU.
 
-`all` is the only run parameter in this step. With no cases it prints a line and exits 0. With cases, and no harness yet, it prints that the runner is a later step and exits non-zero. It does not guess a command line for `tests/harness/run.sh`. Further parameters wait until there is a case to run.
+`all` is the only run parameter in this step. With no cases it prints a line and exits 0. The draft said that, once cases existed and the harness did not, `all` would print that the runner was a later step and exit non-zero. The harness exists. `all` calls `tests/harness/run.sh` on `tests/suites/first-batch.list`. The Lua file still has no QEMU command of its own. Further parameters wait until there is a case to run.
 
 If stdout is not a terminal, no arguments prints the same rows as text and exits 0. `--help` prints usage and exits 0. Anything else prints usage and exits non-zero.
 
@@ -246,18 +251,18 @@ The catalogue file stays the list. Running a case stays in the harness. Split th
 
 Third-party source that this tree builds lives in `vendored/<project>/`, one upstream per folder, with its license and a `VERSION` file. Unity is the first. Firmware on the host and luarocks modules are not vendored. QueueOS sources do not go in that tree.
 
-CMake is the front door. The lists live in `cmake/` and the root `CMakeLists.txt` includes them. Configure with `cmake -S . -B build`. Python 3 is the image builder and the harness, because QMP and the PPM sample are poor shell. Python is not part of the OS.
+CMake is the front door. The lists live in `cmake/` and the root `CMakeLists.txt` includes them. Configure with `cmake -S . -B build`. The draft named Python 3 as the image builder and the harness, on the grounds that QMP and the PPM sample were poor shell, and added that Python was not part of the OS. The language rules then kept Python out of the repository entirely. `tools/mkimage.c` builds the images. The harness is Bash. QMP is one `socat` connection that sends `qmp_capabilities` before the payload. The PPM sample is Bash.
 
 | Command | What it does |
 |---|---|
 | `cmake --build build` | Build the host tests, both EFI stubs, the current database image, and the `a-001` and `a-002` boot folders. |
 | `cmake --build build --target test-first` | Run `tests/suites/first-batch.list` under one new run id. Exit non-zero if any case fails. |
 | `cmake --build build --target test-case` | Run the case named by `-DCASE=D-001-001` under one new run id. |
-| `cmake --build build --target test-second` | Run the second-batch list, including the `a-003-pc-base` folder. Used after the first batch is green. |
+| `cmake --build build --target test-second` | Not a target. Plan 002 adds it with the second-batch list and `a-003-pc-base`. |
 | `cmake --build build --target run` | Boot `images/a-001-q35-base` and leave the screen up. |
 | `cmake --build build --target clean` | Remove build products under `build/`. Leave `images/` disks and `results/` in place. |
 
-The sentence tests are the host target that exists now: `sentences`, run by `ctest --test-dir build`. The image targets and `test-first` arrive with the image builder and the harness. `run` allocates a run id and writes `serial.log` there. If `DISPLAY` or `WAYLAND_DISPLAY` is set, QEMU gets a window and the process stays in the foreground until the guest exits or the user interrupts it. Otherwise it uses the same headless capture as `D-001` and prints the result path. `tq` with no arguments is the catalogue. It is not a second way to start `test-first`.
+`sentences`, `efi-headers`, and `image-a001` run under `ctest --test-dir build`. `test-first` runs the first batch. The draft said the image targets and `test-first` would arrive later. They have arrived. `run` allocates a run id and writes `serial.log` there. If `DISPLAY` or `WAYLAND_DISPLAY` is set, QEMU gets a window and the process stays in the foreground until the guest exits or the user interrupts it. Otherwise it uses the headless capture and prints the result path. `tq` with no arguments is the catalogue. `tq all` calls the harness on the first-batch list.
 
 ## 8. Run ids and result folders
 
@@ -294,7 +299,7 @@ expect=QueueOS loading...
 mutate=none
 ```
 
-Checks this slice implements:
+Checks. `annotation` is the row the runner never grew. The others are what the first batch runs.
 
 | Check | Pass rule |
 |---|---|
@@ -306,13 +311,13 @@ Checks this slice implements:
 | `image-esp` | UEFI image has a protective MBR, a GPT header, one ESP partition, and a FAT32 BPB whose label is `QOS-ESP`. |
 | `image-payloads` | The ESP tree in section 4 is present. `BOOTX64.EFI` matches `current/Boot.efi` byte for byte. Both Boot and Base are PE32+ EFI applications, machine `0x8664`, subsystem 10. `rescue/RESCUE` is `rescue\n`. |
 | `image-base-size` | `current/Base.efi` is smaller than 500 KiB. |
-| `serial-contains` | `serial.log` contains `expect` as a line, at least once. |
+| `serial-contains` | `serial.log` contains `expect` at least once. On this firmware the console is also mirrored to the serial file, with ANSI sequences around the sentence, so the match is the text rather than a line that contains nothing else. |
 | `serial-order` | The first occurrence of `QueueOS loading...` precedes the first occurrence of `QueueOS Loaded`. |
-| `serial-absent` | `serial.log` does not contain `expect`. |
+| `serial-absent` | `serial.log` does not contain `expect`. The runner sleeps 25 seconds, then fails if the text is present. No first-batch case uses it. |
 | `screenshot-present` | `screenshot.ppm` exists, is a binary P6 PPM, and is larger than 1 KiB. |
 | `screenshot-red` | At least 40 percent of sampled pixels are red-dominant: `R > 80`, `R > G + 40`, and `R > B + 40`. Sample every 16th pixel. |
 | `screenshot-not-requested` | `meta.txt` says a screenshot was not requested, and no `screenshot.ppm` was written. |
-| `annotation` | `annotation.txt` contains the case's `expect` line. Used by failure cases. |
+| `annotation` | Specified here for failure cases: `annotation.txt` would contain the case's `expect` line. The runner never grew this check, and overloading `expect` was the wrong shape. Plan 002 splits `annotation=` from `expect=`. |
 
 Image checks do not start QEMU. They read `images/a-001-q35-base/` and the database version that folder's `image.conf` resolves.
 
@@ -328,10 +333,12 @@ qemu-system-x86_64
   -no-shutdown
   -drive if=pflash,format=raw,readonly=on,unit=0,file=<OVMF_CODE>
   -drive if=pflash,format=raw,unit=1,file=<OVMF_VARS copy>
+  -boot menu=on,splash-time=10000
   -drive if=none,id=esp,format=qcow2,file=<UEFI copy>
-  -device virtio-blk-pci,drive=esp,bootindex=1
   -drive if=none,id=db,format=qcow2,file=<database copy>
-  -device virtio-blk-pci,drive=db,bootindex=2
+  -device virtio-scsi-pci,id=scsi0
+  -device scsi-hd,bus=scsi0.0,drive=esp,bootindex=1,vendor=QueueOS,product=Boot,serial=qos-boot
+  -device scsi-hd,bus=scsi0.0,drive=db,bootindex=2,vendor=QueueOS,product=Base,serial=qos-base
   -serial file:<serial.log>
   -vga std
   -display none
@@ -357,15 +364,15 @@ The edk2 directory on this machine also has 4 MiB qcow2 firmware. Leave it alone
 
 Deprecation warnings from `-drive if=pflash` do not fail a case.
 
-Screenshot path: the harness waits until `serial.log` contains the line that case needs, sends QMP `qmp_capabilities` and `screendump`, then sends `quit`. Overall timeout is 30 seconds. On timeout it kills QEMU, marks the case failed, and keeps the logs. `-no-shutdown` leaves the frame buffer available if the guest returns from the EFI app before the dump.
+Screenshot path: the harness waits until `serial.log` contains the line that case needs, sends QMP `qmp_capabilities` and `screendump`, then sends `quit`. Overall timeout is 50 seconds. The firmware start-boot progress holds for ten seconds before Boot runs, and a case that waits for `QueueOS Loaded` also waits out Boot's countdown. On timeout it kills QEMU, marks the case failed, and keeps the logs. `-no-shutdown` leaves the frame buffer available if the guest returns from the EFI app before the dump.
 
 The red-pixel check is allowed one calibration after the first real PPM if OVMF's drawn red falls outside the thresholds above. Calibration changes the thresholds in this plan's check, records the captured reason in `tests/README.md`, and does not weaken the serial-line checks.
 
-Boot's screen may already show `QueueOS Loaded` by the time a D-case screenshot runs, because Base clears the screen after it starts. The serial log is the record of the loading sentence. The screenshot proves a red display was produced. Do not OCR the PPM.
+A D-case screenshot is taken when `QueueOS loading...` appears, which is before the countdown finishes and before Base starts, so the frame is Boot's red screen. An E-case screenshot is taken when `QueueOS Loaded` appears, during Base's countdown. The serial log is the record of the sentences. The screenshot proves a red display was produced. Do not OCR the PPM. The firmware boot menu is captured by the headless `run` target, not by these cases.
 
 ### Failure annotations
 
-Second-batch failure cases write `annotation.txt` in the case directory before judging the serial log. The annotation is a fixed sentence, so the result says what kind of failure was observed.
+The draft said second-batch failure cases would write `annotation.txt` in the case directory before judging the serial log. That write was not built. The sentences below are the ones plan 002 still uses. The annotation is a fixed sentence, so the result says what kind of failure was observed. The harness copies it from the case. It does not parse it out of firmware text.
 
 | Situation | Annotation line |
 |---|---|
@@ -419,7 +426,7 @@ Unity is ThrowTheSwitch Unity 2.7.0, MIT, imported under `vendored/unity/` with 
 
 `A-001` checks `images/a-001-q35-base` and the database version it resolves. The UEFI bytes are not specific to the q35 chipset. `a-002-q35-serial` is a boot folder, not a second image package, and these checks do not repeat against it. The `pc` folder is `images/a-003-pc-base`, checked in the second batch.
 
-`ctest` runs the same five checks as `image-a001` through `tests/host/check-images.sh`. Catalogue `case.conf` files wait for the harness, so `tq all` still has no cases.
+`ctest` runs the same five image checks as `image-a001` through `tests/host/check-images.sh`, plus `sentences` and `efi-headers`. The catalogue has the eighteen first-batch cases. `tq all` runs that list.
 
 ### D-001 — q35 graphical Boot
 
@@ -461,60 +468,63 @@ D and E are separate cases even though a single guest run prints both lines. Run
 
 ## 12. Second batch
 
-Write `tests/suites/second-batch.list` with the cases below as part of this plan's implementation, and run it after section 11 is green. The failure cases mutate `work/` copies only.
+Moved to [002 — Second batch](002-second-batch.md) after `results/000-005`. The original ask was six cases: three mutations of an `a-001` work copy (missing `BOOTX64.EFI`, `BootFail.efi` in place of Boot, missing `Base.efi`), then `images/a-003-pc-base` as machine `pc` with the same ESP bytes, then the Boot and Base sentences on that machine. Plan 002 holds the case files, the pass rules, and the corrections. The table that used to live here is not repeated, so this file cannot drift into a second contract.
 
-| Case | What it does | Pass |
-|---|---|---|
-| `D-003-001` | Delete `EFI/BOOT/BOOTX64.EFI` from the run copy. | `serial-absent` for `QueueOS loading...`, and the firmware-handoff annotation. |
-| `D-003-002` | Replace current Boot and `BOOTX64.EFI` with `BootFail.efi`. | Serial contains the Boot sentence, does not contain `QueueOS Loaded`, and the annotation says Boot returned before starting Base. |
-| `D-003-003` | Delete `EFI/QueueOS/current/Base.efi` from the run copy. | Serial contains the failure sentence, does not contain `QueueOS Loaded`, and the annotation says Boot could not start Base. |
-| `A-003-001` | Read `images/a-003-pc-base/image.conf`. | `machine` is `pc`, `qemu` is `qemu-system-x86_64`, and the firmware paths match `a-001-q35-base`. The folder's UEFI qcow2 matches `a-001-q35-base` byte for byte. |
-| `D-004-001` | Boot `images/a-003-pc-base` and run q35's graphical Boot check. | Serial contains `QueueOS loading...`. `meta.txt` says machine `pc`. |
-| `E-003-001` | Boot `images/a-003-pc-base` and run q35's graphical Base check. | Loading precedes Loaded. `meta.txt` says machine `pc`. |
+What the boots changed, in short:
 
-If the first q35 graphical run never prints a Boot line, and the serial log shows that the firmware never saw a disk, switch the virtio-blk devices in the harness command to AHCI and record that attachment in `tests/README.md`. Do that once, for every boot folder, rather than per case. On q35 the fallback devices are an `ich9-ahci` controller and two disks on that bus. On `pc`, use the machine's IDE bus the same way. Keep boot indexes 1 and 2.
+- The first disk attachment was virtio block. The firmware menu drew `UEFI Misc Device` and `UEFI Misc Device 2`. FAT labels, GPT names, and a virtio-blk serial never reach that menu. Section 9's command is virtio-scsi, vendor `QueueOS`, products `Boot` and `Base`. The menu then drew `UEFI QueueOS Boot` and `UEFI QueueOS Base`. The AHCI fallback in the old section 12 was not used. Plan 002 keeps it for a boot whose log shows the firmware never saw a disk, and does not switch ahead of that boot.
+- `-boot menu=on,splash-time=10000` is the ten-second `Start boot option` progress on this OVMF. The blue `Please select boot device:` list is where the guest returns, and that list waits for a key.
+- `mutate=` is in every first-batch `case.conf`. The runner does not read it. The annotations in section 9 were specified and not written.
 
-A later boot folder may set `qemu` to `qemu-system-aarch64` and name a firmware path that is not `OVMF_CODE.fd`. No case in either batch list references it. The suite does not fail because that platform is absent.
+A later boot folder may set `qemu` to `qemu-system-aarch64` and name a firmware path that is not `OVMF_CODE.fd`. No case in the first batch references it, and plan 002 does not add one. The suite does not fail because that platform is absent.
 
 ## 13. Order of work
 
 1. Ignore `/results/`. Done. The catalogue can read that tree without Git storing it.
-2. The catalogue `tests/test-queueos.lua` is in place. It lists cases and does not boot them.
+2. The catalogue `tests/test-queueos.lua` is in place. It lists cases. `all` calls the harness. The Lua file does not boot a guest by itself.
 3. Add `diagnostics.h` and the three Unity cases under `vendored/unity`. Run them with `ctest`. Done.
-4. Add the freestanding EFI support and both stubs. Done. `ctest` passes `sentences` and `efi-headers`. Do not debug the red screen by hand before the harness exists.
-5. Add `tools/mkimage.c`, the `image.conf` files, the database version, the `a-001` and `a-002` folders, and the A-001 checks. Done. `image-a001` passes. The builder is host C and the checks are Bash. `a-003` waits for the second batch.
-6. Add the harness and the D and E cases. Each case names its boot folder.
-7. Run `test-first` and fix the slice until the first batch passes.
-8. Run `test-second` until the second batch passes.
-9. Write `tests/README.md`: how to run the two suites, where a result goes, the scaffold sentence from section 5, and any calibration from section 9.
-10. Leave `brainstorming/` as exploration. Do not describe the stub sentences or the ESP-resident Base as the boot architecture.
+4. Add the freestanding EFI support and both stubs. Done. `ctest` passes `sentences` and `efi-headers`. The red screen was debugged with the harness, which is what this step was trying to protect.
+5. Add `tools/mkimage.c`, the `image.conf` files, the database version, the `a-001` and `a-002` folders, and the A-001 checks. Done. `image-a001` passes. The builder is host C and the checks are Bash. `a-003` waits in plan 002. `images/a-001-q35-base/vm.conf` names the local guest copy that the image build refreshes. `tools/mkimage.c` is 985 lines. Plan 002 adds `a-003` as another `image.conf`, which the existing folder scan already picks up.
+6. Add the harness and the D and E cases. Done. Each case names its boot folder. The runner is `tests/harness/run.sh`. `cmake --build build --target test-first` runs the first batch.
+7. Run `test-first` and fix the slice until the first batch passes. Done. `results/000-005` is eighteen passes. The counter's next id is `000-006`.
+8. Second batch. Moved to plan 002. `test-second` does not exist yet.
+9. `tests/README.md` covers the first batch: how to run it, where a result goes, the scaffold sentence from section 5, the two countdowns, the menu names, and the red-on-red attribute. The two-suite note waits until plan 002 has a second suite. The red-pixel calibration in section 9 was not required. The thresholds held.
+10. Done. `brainstorming/` stays exploration. The stub sentences and the ESP-resident Base are a scaffold.
 
 ## 14. Done when
 
-- `test-first` exits 0 on this machine, and `results/<run>/summary.txt` shows all eighteen first-batch cases passed.
-- `test-second` exits 0, with the six second-batch cases passed.
-- A second `test-first` uses the next run id and does not change `manifest.sha256`.
-- `run` produces the red Base screen when a window is available, and a captured PPM when it is not.
-- `current/Base.efi` is under 500 KiB, and the database image has no filesystem.
+Met on this machine:
+
+- `results/000-005/summary.txt` shows all eighteen first-batch cases passed. Earlier runs occupy `000-001` through `000-004`. The counter advanced. This close-out did not launch another `test-first` to re-prove that a second invocation leaves `manifest.sha256` alone. `A-001-001` inside `000-005` is the checksum check that passed.
+- The headless `run` path captured the red Boot screen, the red Base screen, and the firmware device menu. The virt-manager guest `QueueOS a-001` is what was watched by hand. The image refresh does not copy `OVMF_VARS.fd`. This close-out did not start the domain. It was shut off, and the variables file was 131072 bytes with mtime `2026-11-24 17:59:39 -0700`. An earlier note from the same day said `17:23:57`. The file has been written since that note. Leave it alone.
+- `current/Base.efi` is the small stub, under the 500 KiB tripwire, and `A-001-002` still sees a blank database image.
 - No source file, image builder, or test writes a database header, a generation record, or a boot-success flag.
 
-## 15. Risks to watch on the first real run
+Moved to plan 002:
 
-- `ConOut` and the serial port are different devices. A stub that only calls `OutputString` will pass a screenshot glance and fail every serial assertion. The port writes in section 6 are the fix, and they are part of the stub, not an optional debug aid.
-- A graphical case that assumes `ConOut` is never null will fault the serial-only case. The null check in section 6 is required.
-- Opening the host `OVMF_VARS.fd` directly makes later runs nondeterministic and may require root to restore it. Always boot a copy.
-- The Microsoft x64 attribute on UEFI function pointers is load-bearing. A System V call into `OutputString` typically faults before any sentence appears. That looks like a firmware failure and is a calling-convention bug.
-- The red-pixel thresholds may need the single calibration in section 9. The serial sentences stay exact.
-- Virtio block may be invisible to this OVMF build. Section 12's AHCI fallback is the response.
+- `test-second` exits 0, with the six second-batch cases passed.
+
+## 15. What the first real runs actually did
+
+These were written as risks. The ones that fired are recorded as history. The ones that are still load-bearing stay as rules.
+
+- `ConOut` and the serial port are different devices. A stub that only calls `OutputString` passes a screenshot glance and fails every serial assertion. The port writes in section 6 are part of the stub.
+- A graphical case that assumes `ConOut` is never null faults the serial-only case. The null check in section 6 stays.
+- Opening the host `OVMF_VARS.fd` directly makes later runs nondeterministic. The harness copies it. The image refresh leaves the virt-manager copy alone.
+- The Microsoft x64 attribute on UEFI function pointers is load-bearing. A System V call into `OutputString` faults before any sentence appears.
+- The red-pixel thresholds did not need the calibration in section 9. Leave them as written.
+- Virtio block was invisible to this OVMF menu. The lines were `UEFI Misc Device` and `UEFI Misc Device 2`. Virtio-scsi fixed the names. AHCI was not the fix. See section 12.
+- `SetAttribute` does not repaint glyphs already drawn. Red on red hides the firmware line that follows a successful return, and it leaves `QueueOS Loaded` white. The failure path does not change the attribute.
 - FAT does not reliably store an empty directory. `previous/.keep` is why that slot has a file.
 - AArch64 firmware, when that plan arrives, is a different file and a different QEMU binary. Reusing `OVMF_CODE.fd` there will not boot.
 
 ## 16. What the next plans will have to pick up
 
-These are not written yet, and this list is an order implied by the interview, not a set of accepted designs.
+Plan 002 is written and is the next slice to build. The rest of this list is an order implied by the interview, not a set of accepted designs.
 
-1. The smallest database-disk header that lets Boot checksum an instance and fetch the x86-64 Base, replacing the scaffold in section 5.
-2. Enumeration, latest-by-timestamp selection, and the timer that highlights the most recent successful boot when the latest attempt failed. The success presumption in the interview log is the starting point, and it is still not a finished criterion.
-3. The Lua text TUI on top of the C shim, after the stub screen has been proven.
-4. The updater: write a new package, verify it, then set firmware order to new, then previous. Never replace rescue.
-5. The database engine inside Base, which is the work the interview expects to dominate the early schedule once these batches are green.
+1. Plan 002: the six second-batch cases, the `pc` folder, and the harness mutations. Build that before the database header.
+2. The smallest database-disk header that lets Boot checksum an instance and fetch the x86-64 Base, replacing the scaffold in section 5.
+3. Enumeration, latest-by-timestamp selection, and the timer that highlights the most recent successful boot when the latest attempt failed. The success presumption in the interview log is the starting point, and it is still not a finished criterion.
+4. The Lua text TUI on top of the C shim, after the stub screen has been proven.
+5. The updater: write a new package, verify it, then set firmware order to new, then previous. Never replace rescue.
+6. The database engine inside Base, which is the work the interview expects to dominate the early schedule once these batches are green.

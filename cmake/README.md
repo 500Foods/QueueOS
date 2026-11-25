@@ -18,7 +18,8 @@ Hydrogen splits its build the same way, one file per concern. QueueOS starts wit
 | `CMakeLists-host.cmake` | Host test `sentences`, plus the `pe-reloc` and `mkimage` tools. |
 | `CMakeLists-efi.cmake` | Freestanding x86-64 Boot, Base, and BootFail stubs, plus the `efi-headers` check. |
 | `CMakeLists-image.cmake` | `images` target and the `image-a001` check. |
+| `CMakeLists-harness.cmake` | `test-first`, `test-case`, and `run`. |
 
-The QEMU harness gets its own list when that target exists. Debug, sanitizer, and coverage variants wait until a program needs them.
+`test-second` waits until `images/a-003-pc-base` exists. Debug, sanitizer, and coverage variants wait until a program needs them.
 
 `QUEUEOS_VERSION` is the three-part version. CMake's `PROJECT_VERSION` is not that string.

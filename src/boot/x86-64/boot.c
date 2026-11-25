@@ -3,6 +3,11 @@
  * Scaffold: Base is loaded from \EFI\QueueOS\current\Base.efi on the same
  * device this image was loaded from. The database disk is not read. A later
  * plan replaces this with a fetch from that disk. There is no fs0: guess.
+ *
+ * The loading sentence is written first, then a 10-second countdown stays
+ * on screen before StartImage. The harness matches that sentence and does
+ * not wait out the countdown. A person starting the guest can see Boot
+ * before Base clears the screen.
  */
 
 #include "diagnostics.h"
@@ -162,11 +167,56 @@ static QUEUEOS_EFI_STATUS queueos_start_base(
     return boot->start_image(child, 0, 0);
 }
 
+static void queueos_boot_countdown(QUEUEOS_EFI_SYSTEM_TABLE *system)
+{
+    int second;
+
+    for (second = 10; second >= 1; second--) {
+        char screen[48];
+        char line[40];
+        const char *prefix = "QueueOS-Boot: countdown ";
+        int i = 0;
+        int n = 0;
+
+        while (QUEUEOS_BOOT_SENTENCE[n] != '\0' && i + 4 < (int)sizeof screen) {
+            screen[i++] = QUEUEOS_BOOT_SENTENCE[n++];
+        }
+        screen[i++] = '\r';
+        screen[i++] = '\n';
+        if (second >= 10) {
+            screen[i++] = '1';
+            screen[i++] = '0';
+        } else {
+            screen[i++] = (char)('0' + second);
+        }
+        screen[i] = '\0';
+        queueos_screen_show(system, screen);
+
+        i = 0;
+        while (prefix[i] != '\0' && i + 3 < (int)sizeof line) {
+            line[i] = prefix[i];
+            i++;
+        }
+        if (second >= 10) {
+            line[i++] = '1';
+            line[i++] = '0';
+        } else {
+            line[i++] = (char)('0' + second);
+        }
+        line[i] = '\0';
+        queueos_serial_write_line(line);
+        if (system != 0 && system->boot_services != 0 && system->boot_services->stall != 0) {
+            system->boot_services->stall(1000u * 1000u);
+        }
+    }
+}
+
 QUEUEOS_EFI_STATUS QUEUEOS_EFIAPI efi_main(void *image, QUEUEOS_EFI_SYSTEM_TABLE *system)
 {
     QUEUEOS_EFI_STATUS status;
 
     queueos_report(system, "QueueOS-Boot: entry", QUEUEOS_BOOT_SENTENCE);
+    queueos_boot_countdown(system);
     status = queueos_start_base(system, image);
     if (status != QUEUEOS_EFI_SUCCESS) {
         queueos_serial_init();
@@ -175,5 +225,8 @@ QUEUEOS_EFI_STATUS QUEUEOS_EFIAPI efi_main(void *image, QUEUEOS_EFI_SYSTEM_TABLE
     }
     queueos_serial_init();
     queueos_serial_write_line("QueueOS-Boot: base started");
+    /* Last ConOut change before firmware runs. The failure return above
+     * leaves the loading sentence visible. */
+    queueos_screen_attribute(system, QUEUEOS_TEXT_RED_ON_RED);
     return QUEUEOS_EFI_SUCCESS;
 }

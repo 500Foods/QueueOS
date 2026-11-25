@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # A-001 checks for images/a-001-q35-base. No QEMU.
-# usage: check-images.sh --root DIR
+# usage: check-images.sh --root DIR [--check NAME]
+# NAME selects one A-001 check. The default runs all five.
 
 set -euo pipefail
 
@@ -11,6 +12,7 @@ source "$script_dir/pe-read.sh"
 DISK_BYTES=$((64 * 1024 * 1024))
 ESP_TYPE=28732ac11ff8d211ba4b00a0c93ec93b
 ROOT=
+CHECK=all
 
 die() {
     echo "$1" >&2
@@ -18,7 +20,7 @@ die() {
 }
 
 usage() {
-    die "usage: check-images.sh --root DIR"
+    die "usage: check-images.sh --root DIR [--check NAME]"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -26,6 +28,11 @@ while [[ $# -gt 0 ]]; do
         --root)
             [[ $# -ge 2 ]] || usage
             ROOT=$2
+            shift 2
+            ;;
+        --check)
+            [[ $# -ge 2 ]] || usage
+            CHECK=$2
             shift 2
             ;;
         *)
@@ -186,8 +193,13 @@ check_payloads() {
     require_efi "$boot"
     require_efi "$current"
     require_efi "$base"
-    [[ $(stat -c '%s' "$base") -lt $((500 * 1024)) ]] || die "Base.efi is $(stat -c '%s' "$base") bytes"
     echo "image-payloads ok"
+}
+
+check_base_size() {
+    local base=$1/EFI/QueueOS/current/Base.efi
+    [[ -f $base ]] || die "current/Base.efi is missing"
+    [[ $(stat -c '%s' "$base") -lt $((500 * 1024)) ]] || die "Base.efi is $(stat -c '%s' "$base") bytes"
     echo "image-base-size ok"
 }
 
@@ -199,11 +211,42 @@ database=$(resolve_database "$folder")
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
-check_database "$folder" "$database"
-qemu-img convert -O raw "$folder/QueueOS-UEFI.qcow2" "$TMP/uefi.raw"
-check_esp "$TMP/uefi.raw"
-mkdir -p "$TMP/tree"
-mcopy -i "$TMP/uefi.raw@@1M" -s "::/" "$TMP/tree"
-check_checksum "$folder" "$TMP/tree"
-check_payloads "$TMP/tree"
+prepare_uefi() {
+    qemu-img convert -O raw "$folder/QueueOS-UEFI.qcow2" "$TMP/uefi.raw"
+    mkdir -p "$TMP/tree"
+    mcopy -i "$TMP/uefi.raw@@1M" -s "::/" "$TMP/tree"
+}
+
+case $CHECK in
+    all)
+        check_database "$folder" "$database"
+        prepare_uefi
+        check_esp "$TMP/uefi.raw"
+        check_checksum "$folder" "$TMP/tree"
+        check_payloads "$TMP/tree"
+        check_base_size "$TMP/tree"
+        ;;
+    image-database-blank)
+        check_database "$folder" "$database"
+        ;;
+    image-esp)
+        prepare_uefi
+        check_esp "$TMP/uefi.raw"
+        ;;
+    image-checksum)
+        prepare_uefi
+        check_checksum "$folder" "$TMP/tree"
+        ;;
+    image-payloads)
+        prepare_uefi
+        check_payloads "$TMP/tree"
+        ;;
+    image-base-size)
+        prepare_uefi
+        check_base_size "$TMP/tree"
+        ;;
+    *)
+        die "unknown image check: $CHECK"
+        ;;
+esac
 exit 0

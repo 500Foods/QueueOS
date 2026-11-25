@@ -29,6 +29,11 @@ typedef uint64_t QUEUEOS_EFI_STATUS;
 /* White foreground, red background, in the UEFI text palette. */
 #define QUEUEOS_TEXT_WHITE_ON_RED ((QUEUEOS_UINTN)(0x0Fu | 0x40u))
 
+/* Same red for the glyph and the field. SetAttribute does not repaint
+ * characters that are already on screen. Later firmware text that leaves
+ * the attribute alone is drawn in this color and disappears into the field. */
+#define QUEUEOS_TEXT_RED_ON_RED ((QUEUEOS_UINTN)(0x04u | 0x40u))
+
 typedef struct QUEUEOS_EFI_TABLE_HEADER {
     uint64_t signature;
     uint32_t revision;
