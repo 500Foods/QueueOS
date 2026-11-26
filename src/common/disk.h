@@ -5,7 +5,7 @@
  *
  * Ten slots of 4 KiB start at byte 0. The boot range follows them and
  * holds Base and, later, pictures. The database body starts at
- * QUEUEOS_BODY_START. The first page there is one stored record.
+ * QUEUEOS_BODY_START. The first page there is a ring of stored rows.
  * Later body bytes stay put. Both numbers live only in this file so
  * the body can move without a second copy drifting through readers,
  * tests, or sample JSON. Neither number is a format version. A slot
@@ -20,7 +20,7 @@
 /* 8 MiB from the start of the disk. */
 #define QUEUEOS_BODY_START (8u * 1024u * 1024u)
 
-/* The one record page at QUEUEOS_BODY_START. */
+/* The ring page at QUEUEOS_BODY_START. */
 #define QUEUEOS_BODY_PAGE 4096u
 
 #endif

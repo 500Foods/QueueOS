@@ -106,11 +106,21 @@ Status: accepted for the publisher. Plan 003 was marked ready on 2026-11-25. `pl
 
 ## Plan 004 interview
 
-Status: accepted for plan 004. `plans/004-body-record.md` was marked ready on 2026-11-25 and is the active slice. Nothing in it is built. The answers below are the cluster from 2026-11-25, after plan 003 closed.
+Status: accepted for plan 004. `plans/004-body-record.md` was marked ready on 2026-11-25 and was the active slice. Nothing in it was built when these answers were written. Plan 004 closed later that day. The sentences below stay as they were. No following plan is ready. Plan 005 is not opened. The answers below are the cluster from 2026-11-25, after plan 003 closed.
 
 - The slice is one record in the database body, past 8 MiB. A later boot reads it back. Queues, SQL, and buffer pools stay out of the slice.
 - The record remembers that this boot stored it: a stamp and the slot number. Name and version stay in the slot. The slot's `booted` line stays the publisher's completion mark.
 - Base reads the old record and prints it on the serial line, then writes the new stamp and slot, then prints `QueueOS Loaded`. The first boot has nothing to read, so it stays quiet, writes the record, and prints Loaded. Boot still only reads slots.
 - The page is two text lines. `stored STAMP slot N`, then `sha256` and 64 hex digits of that stored line. The rest of the 4 KiB page is zeros. Zeros, a bad hash, or a bad stamp mean there is no record. Base stays free of Jansson. The page is this record's shape. A later plan can replace it with a table.
+
+## Plan 005 interview
+
+Status: accepted for plan 005. `plans/005-body-ring.md` was marked ready on 2026-11-25 and is the active slice. Nothing in it was built when these answers were written. Both steps were built later that day. The sentences below stay as they were. The answers below are the cluster from 2026-11-25, after plan 004 closed.
+
+- The slice replaces the text page with a fixed ring on that same 4 KiB page. Queues, SQL, buffer pools, a second page, and a page map stay out. Boot still does not read the body.
+- Base links the Jansson Boot already uses. Keeping it out of Base was a cut for the one-line page, not a rule that Base never links it.
+- The page is one JSON array of objects, then the same `sha256` line a slot uses. The hash covers the JSON bytes only. Each object is the stamp and the slot. The writer's objects are compact, with the keys `stored` and `slot` in that order. A spaced or reordered object is still a ring when the hash matches.
+- Each boot appends one object. The newest object is last. Base prints the previous object's `stored STAMP slot N` sentence, then appends. A full page drops the oldest object. A zero page or a rejected page prints nothing and is replaced by a one-element array.
+- The writer does not call `json_dumps`. Jansson walks keys in hashtable order, and that order follows the hash seed. The canonical text is written by hand and then parsed with Jansson before the page is committed.
 
 

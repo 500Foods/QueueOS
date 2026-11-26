@@ -1,9 +1,10 @@
 /* QueueOS-Base stub.
  *
  * The Loaded sentence is drawn first. The completion path then writes
- * the slot line and the body page. An older stored line, when the page
- * has one, is printed there. The serial Loaded sentence comes after
- * that. The harness quits QEMU once the line it is waiting for has
+ * the slot line and appends one row to the body ring. The newest stored
+ * sentence, when the page holds a ring, is printed there. The serial
+ * Loaded sentence comes after that. The harness quits QEMU once the line
+ * it is waiting for has
  * arrived, so both writes have to finish before that line is printed.
  * A failed write still prints the sentence.
  *

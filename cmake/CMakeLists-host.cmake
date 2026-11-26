@@ -73,10 +73,13 @@ add_executable(body-page-test
     "${CMAKE_SOURCE_DIR}/src/common/publish.c"
     "${CMAKE_SOURCE_DIR}/src/common/slot-text.c"
     "${CMAKE_SOURCE_DIR}/src/common/sha256.c"
+    ${QUEUEOS_JANSSON_SOURCES}
     "${QUEUEOS_UNITY_DIR}/unity.c"
 )
 target_include_directories(body-page-test PRIVATE
     "${CMAKE_SOURCE_DIR}/src/common"
+    "${CMAKE_SOURCE_DIR}/src/boot/jansson-config"
+    "${CMAKE_SOURCE_DIR}/vendored/jansson/src"
     "${QUEUEOS_UNITY_DIR}"
 )
 target_compile_options(body-page-test PRIVATE -Wall -Wextra -Werror)

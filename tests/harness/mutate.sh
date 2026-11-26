@@ -123,8 +123,8 @@ apply_mutation() {
             db_raw=$GUEST_DIR/work/database.raw
             db_next=$GUEST_DIR/work/database-mutated.qcow2
             db_page=$GUEST_DIR/work/body-page
-            db_line='stored 2026-11-25T00:00:00Z slot 1'
-            db_expect=b5584f1334084037dd6be0610f569914deac15d8651c367ec5b7f98e5edc59bf
+            db_line='[{"stored":"2026-11-25T00:00:00Z","slot":1}]'
+            db_expect=fe46aee0aa27eade88658f2037557cde0a585d52ef1291cec0805225d38b6570
             db_off=$(disk_constant QUEUEOS_BODY_START) || {
                 echo "QUEUEOS_BODY_START is missing" >&2
                 return 1

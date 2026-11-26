@@ -1,4 +1,5 @@
-/* Writes the completion line for the slot Boot named, then the body page.
+/* Writes the completion line for the slot Boot named, then appends one
+ * row to the body ring.
  *
  * Load options are ASCII "slot N" and a trailing NUL. The size counts
  * that NUL. Anything else means this Base was not started that way, and
@@ -10,9 +11,9 @@
  * that will not fit that text, writes nothing. The stamp is not invented.
  *
  * An existing booted line stays the first stamp. The page is still
- * written with this boot's stamp. When the page already holds a record,
- * that stored line is printed before the new page replaces it. A zero
- * or rejected page prints nothing.
+ * written with this boot's stamp. When the page already holds a row,
+ * that newest stored sentence is printed before this boot is appended.
+ * A zero or rejected page prints nothing and becomes one object.
  */
 
 #include "completion.h"
@@ -149,8 +150,9 @@ static int slot_from_options(QUEUEOS_EFI_SYSTEM_TABLE *system, void *image)
 }
 
 /* The slot write has already been accepted. A failed page read leaves
- * the page alone. A record is printed from the bytes just read, and
- * then the buffer is replaced with this boot's page.
+ * the page alone. The newest stored sentence is printed from the bytes
+ * just read, and then this boot's row is appended. A zero or rejected
+ * page prints nothing and is replaced by a one-element array.
  */
 static void store_body(QueueosEfiBlockIo *block, const char *stamp, int slot)
 {

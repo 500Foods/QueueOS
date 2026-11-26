@@ -93,10 +93,10 @@ queueos_add_efi(queueos_boot "${CMAKE_SOURCE_DIR}/src/boot/x86-64/boot.c" "Boot.
 queueos_add_efi(queueos_base "${CMAKE_SOURCE_DIR}/src/base/x86-64/base.c" "Base.efi" -j .bss)
 queueos_add_efi(queueos_boot_fail "${CMAKE_SOURCE_DIR}/src/boot/x86-64/boot-fail.c" "BootFail.efi")
 
-# Base and BootFail stay free of Jansson and Lua. Boot reads the slots
-# and draws the list. Base writes the completion line and one body page,
-# so it links the pool, the slot text, the body page, and the disk move.
-# The script bytes are generated.
+# BootFail stays free of Jansson and Lua. Boot reads the slots and draws
+# the list. Base writes the completion line and the body ring, so it
+# links the pool, the slot text, the body page, the disk move, and the
+# Jansson Boot already uses. The script bytes are generated.
 set(QUEUEOS_GUEST_SCRIPTS_C "${CMAKE_BINARY_DIR}/guest-scripts.c")
 add_custom_command(
     OUTPUT "${QUEUEOS_GUEST_SCRIPTS_C}"
@@ -146,6 +146,11 @@ target_sources(queueos_base PRIVATE
     "${CMAKE_SOURCE_DIR}/src/common/slot-text.c"
     "${CMAKE_SOURCE_DIR}/src/common/body-page.c"
     "${CMAKE_SOURCE_DIR}/src/common/sha256.c"
+    ${QUEUEOS_JANSSON_SOURCES}
+)
+target_include_directories(queueos_base PRIVATE
+    "${CMAKE_SOURCE_DIR}/src/boot/jansson-config"
+    "${CMAKE_SOURCE_DIR}/vendored/jansson/src"
 )
 
 add_test(
