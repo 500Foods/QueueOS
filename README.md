@@ -67,23 +67,23 @@ While this project is currently under active development, feel free to give it a
 [![Count Lines of Code](https://github.com/500Foods/QueueOS/actions/workflows/main.yml/badge.svg)](https://github.com/500Foods/QueueOS/actions/workflows/main.yml)
 <!--CLOC-START -->
 ```cloc
-Last updated at 2026-11-26 05:36:26 UTC
+Last updated at 2026-11-26 18:54:54 UTC
 -------------------------------------------------------------------------------
 Language                     files          blank        comment           code
 -------------------------------------------------------------------------------
-C                               82           5863           5474          38298
-C/C++ Header                    58           1952           2414           5430
-Markdown                        26           2895              2           5294
+C                               82           5897           5486          38543
+C/C++ Header                    58           1952           2417           5430
+Markdown                        27           2938              2           5368
 Lua                              9            226            196           3922
 Bourne Shell                     7             79             68           1138
-CMake                            8             50             66            415
+CMake                            8             50             66            423
 HTML                             1             36              3            295
 make                             1             46             12            174
 reStructuredText                 1             26              6             38
 YAML                             2              8             13             37
 Text                             1              4              0             17
 -------------------------------------------------------------------------------
-SUM:                           196          11185           8254          55058
+SUM:                           197          11262           8269          55385
 -------------------------------------------------------------------------------
 46 Files were skipped (duplicate, binary, or without source code):
   conf: 29
