@@ -1,20 +1,27 @@
-/* Writes the completion line for the slot Boot named.
+/* Writes the completion line for the slot Boot named, then the body page.
  *
  * Load options are ASCII "slot N" and a trailing NUL. The size counts
  * that NUL. Anything else means this Base was not started that way, and
  * the disk is left alone.
  *
- * The stamp is the firmware clock, formatted YYYY-MM-DDTHH:MM:SSZ.
- * The Z is the stand-in from the plan. GetTime is not asked to convert
- * a timezone. A failed GetTime, or a clock field that will not fit that
- * text, writes nothing. The stamp is not invented.
+ * The stamp is one reading of the firmware clock, formatted
+ * YYYY-MM-DDTHH:MM:SSZ. The Z is the stand-in from the plan. GetTime is
+ * not asked to convert a timezone. A failed GetTime, or a clock field
+ * that will not fit that text, writes nothing. The stamp is not invented.
+ *
+ * An existing booted line stays the first stamp. The page is still
+ * written with this boot's stamp. When the page already holds a record,
+ * that stored line is printed before the new page replaces it. A zero
+ * or rejected page prints nothing.
  */
 
 #include "completion.h"
 
+#include "body-page.h"
 #include "disk-io.h"
 #include "disk.h"
 #include "publish.h"
+#include "serial.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -141,6 +148,25 @@ static int slot_from_options(QUEUEOS_EFI_SYSTEM_TABLE *system, void *image)
     return 0;
 }
 
+/* The slot write has already been accepted. A failed page read leaves
+ * the page alone. A record is printed from the bytes just read, and
+ * then the buffer is replaced with this boot's page.
+ */
+static void store_body(QueueosEfiBlockIo *block, const char *stamp, int slot)
+{
+    uint8_t page[QUEUEOS_BODY_PAGE];
+    char line[QUEUEOS_BODY_LINE];
+
+    memset(page, 0, sizeof page);
+    if (!queueos_disk_read(block, QUEUEOS_BODY_START, QUEUEOS_BODY_PAGE, page))
+        return;
+    if (queueos_body_read(page, line, 0) == 1)
+        queueos_serial_write_line(line);
+    if (queueos_body_write(page, stamp, slot) != 0)
+        return;
+    queueos_disk_write(block, QUEUEOS_BODY_START, QUEUEOS_BODY_PAGE, page);
+}
+
 void queueos_base_complete(QUEUEOS_EFI_SYSTEM_TABLE *system, void *image)
 {
     uint8_t slot_bytes[QUEUEOS_SLOT_BYTES];
@@ -166,7 +192,9 @@ void queueos_base_complete(QUEUEOS_EFI_SYSTEM_TABLE *system, void *image)
     memcpy(saved, slot_bytes, QUEUEOS_SLOT_BYTES);
     if (queueos_slot_mark_booted(slot_bytes, stamp) != 0)
         return;
-    if (memcmp(saved, slot_bytes, QUEUEOS_SLOT_BYTES) == 0)
-        return;
-    queueos_disk_write(block, offset, QUEUEOS_SLOT_BYTES, slot_bytes);
+    if (memcmp(saved, slot_bytes, QUEUEOS_SLOT_BYTES) != 0) {
+        if (!queueos_disk_write(block, offset, QUEUEOS_SLOT_BYTES, slot_bytes))
+            return;
+    }
+    store_body(block, stamp, slot);
 }

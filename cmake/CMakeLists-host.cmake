@@ -67,6 +67,21 @@ target_include_directories(publisher-test PRIVATE
 target_compile_options(publisher-test PRIVATE -Wall -Wextra -Werror)
 add_test(NAME publisher COMMAND publisher-test)
 
+add_executable(body-page-test
+    "${CMAKE_SOURCE_DIR}/tests/host/test-body-page.c"
+    "${CMAKE_SOURCE_DIR}/src/common/body-page.c"
+    "${CMAKE_SOURCE_DIR}/src/common/publish.c"
+    "${CMAKE_SOURCE_DIR}/src/common/slot-text.c"
+    "${CMAKE_SOURCE_DIR}/src/common/sha256.c"
+    "${QUEUEOS_UNITY_DIR}/unity.c"
+)
+target_include_directories(body-page-test PRIVATE
+    "${CMAKE_SOURCE_DIR}/src/common"
+    "${QUEUEOS_UNITY_DIR}"
+)
+target_compile_options(body-page-test PRIVATE -Wall -Wextra -Werror)
+add_test(NAME body-page COMMAND body-page-test)
+
 # First database disk. Ten slots and the stub Base. mkimage only wraps qcow2.
 add_executable(db-image
     "${CMAKE_SOURCE_DIR}/tools/db-image.c"

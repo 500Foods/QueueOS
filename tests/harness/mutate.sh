@@ -1,7 +1,9 @@
 # Work-copy mutations. Sourced by run.sh.
 # images/ is not opened for writing. The database work copy is touched
-# only by corrupt-base-bytes. That flips one byte at the start of the
-# boot range, which is where the stub image stores Base.
+# by corrupt-base-bytes and plant-body-record. corrupt-base-bytes flips
+# one byte at the start of the boot range, which is where the stub image
+# stores Base. plant-body-record writes the sample body page at the
+# offset named in src/common/disk.h.
 # losetup, qemu-nbd, and kpartx need privileges, so they are not the path.
 # mtools uses the same @@1M offset as mkimage, and only after the first
 # GPT partition is shown to start at 1 MiB. A different start fails the
@@ -24,6 +26,19 @@ le_uint() {
 
 # 512-byte sectors: the EFI PART signature lives at byte 512, and LBA
 # 2048 is 1 MiB. Any other first-partition start is a failed case.
+
+# QUEUEOS_BODY_START and QUEUEOS_BODY_PAGE live in disk.h. The suffix
+# u is the C unsigned marker. This is the harness reading that file,
+# not a second definition of the numbers.
+disk_constant() {
+    local name=$1
+    local file=$ROOT/src/common/disk.h
+    local line expr
+    line=$(sed -n "s/^#define ${name} //p" "$file" | head -n 1)
+    [[ -n $line ]] || return 1
+    expr=${line//u/}
+    printf '%s' "$((expr))"
+}
 esp_starts_at_1m() {
     local raw=$1
     local sig entry_lba entry_size start_off start_lba
@@ -102,6 +117,61 @@ apply_mutation() {
                 return 1
             fi
             rm -f -- "$db_raw"
+            ;;
+        plant-body-record)
+            db_image=$GUEST_DIR/work/QueueOS-Database.qcow2
+            db_raw=$GUEST_DIR/work/database.raw
+            db_next=$GUEST_DIR/work/database-mutated.qcow2
+            db_page=$GUEST_DIR/work/body-page
+            db_line='stored 2026-11-25T00:00:00Z slot 1'
+            db_expect=b5584f1334084037dd6be0610f569914deac15d8651c367ec5b7f98e5edc59bf
+            db_off=$(disk_constant QUEUEOS_BODY_START) || {
+                echo "QUEUEOS_BODY_START is missing" >&2
+                return 1
+            }
+            db_page_bytes=$(disk_constant QUEUEOS_BODY_PAGE) || {
+                echo "QUEUEOS_BODY_PAGE is missing" >&2
+                return 1
+            }
+            if [[ ! -f $db_image ]]; then
+                echo "work database image is missing" >&2
+                return 1
+            fi
+            if ! qemu-img convert -O raw -- "$db_image" "$db_raw"; then
+                echo "could not read the work database image" >&2
+                return 1
+            fi
+            db_size=$(stat -c '%s' "$db_raw")
+            if (( db_size < db_off + db_page_bytes )); then
+                echo "work database image has no body page" >&2
+                return 1
+            fi
+            db_hash=$(printf '%s' "$db_line" | sha256sum)
+            db_hash=${db_hash%% *}
+            if [[ $db_hash != "$db_expect" ]]; then
+                echo "planted body record hash is ${db_hash}" >&2
+                return 1
+            fi
+            {
+                printf '%s\n' "$db_line"
+                printf 'sha256 %s\n' "$db_hash"
+            } > "$db_page"
+            db_text=$(stat -c '%s' "$db_page")
+            if (( db_text > db_page_bytes )); then
+                echo "body page text does not fit" >&2
+                return 1
+            fi
+            dd if=/dev/zero bs=1 count=$((db_page_bytes - db_text)) status=none >> "$db_page"
+            dd if="$db_page" of="$db_raw" bs=1 seek="$db_off" conv=notrunc status=none
+            if ! qemu-img convert -O qcow2 -- "$db_raw" "$db_next"; then
+                echo "could not write the mutated database image" >&2
+                return 1
+            fi
+            if ! mv -f -- "$db_next" "$db_image"; then
+                echo "could not replace the work database image" >&2
+                return 1
+            fi
+            rm -f -- "$db_raw" "$db_page"
             ;;
         replace-boot-fail)
             if [[ ! -f $BUILD/efi/BootFail.efi ]]; then

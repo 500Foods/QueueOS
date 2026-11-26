@@ -4,13 +4,15 @@
 
 That scaffold is gone. Boot reads the virtio-scsi disk whose product is `Base`, chooses the newest launchable slot, and starts those bytes. The load options are ASCII `slot N` and a trailing NUL. Base does not read them yet. Base reads them and writes `booted STAMP` after the hash line of that slot. The stamp is the firmware clock. The JSON and the hash line stay as they were.
 
+Base writes one page at the 8 MiB mark after that slot line. The page is `stored STAMP slot N` and a sha256 of the stored line. When the page already holds a record, Base prints that stored line before `QueueOS Loaded`.
+
 ```text
 cmake -S . -B build
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-`sentences` checks the three lines in `src/common/diagnostics.h`. `publisher` checks the host publisher against a raw image in memory: a first publish, one stored copy of an identical hash, a publish that does not fit, and a full set of slots whose only completed boot is the oldest. `efi-headers` checks that `build/efi/Boot.efi`, `Base.efi`, and `BootFail.efi` are PE32+ EFI applications with a base-relocation table. `image-a001` checks the `a-001-q35-base` disk and the database image that carries the stub generation. `slot-json` checks the guest classifier: empty, unreadable, the stub candidate, a bad hash, a foreign OS, newest-wins with the lower index on a tie, the body range, and the empty-string digest. `lua-floor` links vendored Lua 5.5.1 with the firmware shims and no C library. It checks `pcall`, `math.floor`, and `string.format`.
+`sentences` checks the three lines in `src/common/diagnostics.h`. `publisher` checks the host publisher against a raw image in memory: a first publish, one stored copy of an identical hash, a publish that does not fit, and a full set of slots whose only completed boot is the oldest. `body-page` checks the one body page: a zero page, the sample record, a refused page, and a publish that leaves the page in place. `efi-headers` checks that `build/efi/Boot.efi`, `Base.efi`, and `BootFail.efi` are PE32+ EFI applications with a base-relocation table. `image-a001` checks the `a-001-q35-base` disk and the database image that carries the stub generation. `slot-json` checks the guest classifier: empty, unreadable, the stub candidate, a bad hash, a foreign OS, newest-wins with the lower index on a tie, the body range, and the empty-string digest. `lua-floor` links vendored Lua 5.5.1 with the firmware shims and no C library. It checks `pcall`, `math.floor`, and `string.format`.
 
 `cmake --build build --target test-first` runs the first batch through `tests/harness/run.sh`. `cmake --build build --target test-second` runs the second batch under its own run id. `tq all` stays the first batch. One run id is `results/<run>/`, and each case keeps `serial.log`, `meta.txt`, `machine.txt` when a guest was started, `annotation.txt` when the case names one, and a screenshot when the case asked for one. The annotation is the case file's sentence. It is not read out of the firmware log.
 

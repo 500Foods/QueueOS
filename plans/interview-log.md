@@ -100,8 +100,17 @@ Status: proposal. These notes are the interview. They are not the plan. Plan 003
 
 ## Decided 2026-11-25
 
-Status: accepted for the publisher. Plan 003 was marked ready on 2026-11-25. `plans/003-slots-and-publisher.md` is the active slice. Nothing in it is built.
+Status: accepted for the publisher. Plan 003 was marked ready on 2026-11-25. `plans/003-slots-and-publisher.md` was the active slice when this note was written. Nothing in it was built then. Plan 003 closed later that day. The sentences below stay as they were.
 
 - When a publish would overwrite the oldest slot, and that slot is the only one that has completed a boot, the publisher leaves it and overwrites the oldest of the other slots. Once a newer slot has also completed a boot, the older one can be overwritten like any other record. Empty, unreadable, foreign, and UNSAFE slots are used before a candidate is dropped. The timer still does not start an UNSAFE row. That rule was already separate from this one.
+
+## Plan 004 interview
+
+Status: accepted for plan 004. `plans/004-body-record.md` was marked ready on 2026-11-25 and is the active slice. Nothing in it is built. The answers below are the cluster from 2026-11-25, after plan 003 closed.
+
+- The slice is one record in the database body, past 8 MiB. A later boot reads it back. Queues, SQL, and buffer pools stay out of the slice.
+- The record remembers that this boot stored it: a stamp and the slot number. Name and version stay in the slot. The slot's `booted` line stays the publisher's completion mark.
+- Base reads the old record and prints it on the serial line, then writes the new stamp and slot, then prints `QueueOS Loaded`. The first boot has nothing to read, so it stays quiet, writes the record, and prints Loaded. Boot still only reads slots.
+- The page is two text lines. `stored STAMP slot N`, then `sha256` and 64 hex digits of that stored line. The rest of the 4 KiB page is zeros. Zeros, a bad hash, or a bad stamp mean there is no record. Base stays free of Jansson. The page is this record's shape. A later plan can replace it with a table.
 
 

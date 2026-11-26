@@ -180,7 +180,8 @@ write_machine_token() {
 }
 
 # One catalogue case. Screenshot checks dump when EXPECT appears.
-# serial-order waits for the Base sentence. serial-absent runs a short
+# serial-order waits for the Base sentence. When the case sets expect,
+# that line has to be in the log as well. serial-absent runs a short
 # window and requires EXPECT to stay missing. A mutation is applied to
 # the work copy after the copy and before QEMU starts.
 guest_case() {
@@ -224,7 +225,10 @@ guest_case() {
             grep -F -q -- "$expect" "$GUEST_SERIAL"
             ;;
         serial-order)
-            guest_order
+            guest_order || return 1
+            if [[ -n ${expect:-} ]]; then
+                grep -F -q -- "$expect" "$GUEST_SERIAL"
+            fi
             ;;
         serial-absent)
             if grep -F -q -- "$expect" "$GUEST_SERIAL"; then
