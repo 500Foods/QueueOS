@@ -245,12 +245,25 @@ local function split_slot(blob)
     local rest = blob:sub(nl + 1)
     local nl2 = rest:find("\n", 1, true)
     local hash_line
+    local tail = ""
     if nl2 then
         hash_line = rest:sub(1, nl2 - 1)
+        tail = rest:sub(nl2 + 1)
     else
         hash_line = rest:gsub("%z+$", "")
     end
-    return json_text, hash_line
+    return json_text, hash_line, tail
+end
+
+local function booted_of(tail)
+    if type(tail) ~= "string" then
+        return ""
+    end
+    local stamp = tail:match("^booted (%g+)\n")
+    if stamp == nil or stamp:find(" ") then
+        return ""
+    end
+    return stamp
 end
 
 function Read.classify(blob, opts)
@@ -272,6 +285,9 @@ function Read.classify(blob, opts)
         name = "",
         version = "",
         published = "",
+        countdown = nil,
+        booted = "",
+        tag = "",
         os = nil,
         json_text = nil,
         hash_stored = nil,
@@ -282,7 +298,8 @@ function Read.classify(blob, opts)
         view_lines = {},
     }
 
-    local json_text, hash_line = split_slot(blob)
+    local json_text, hash_line, tail = split_slot(blob)
+    slot.booted = booted_of(tail)
     if json_text == nil then
         slot.label = label_for(slot)
         slot.view_lines = view_for(slot, nil)
@@ -322,6 +339,8 @@ function Read.classify(blob, opts)
     slot.name = Json.string(Json.field(value, "name")) or ""
     slot.version = Json.string(Json.field(value, "version")) or ""
     slot.published = Json.string(Json.field(value, "published")) or ""
+    slot.countdown = Json.number(Json.field(value, "countdown"))
+    slot.tag = Json.string(Json.field(value, "tag")) or ""
     slot.binaries = read_binaries(Json.field(value, "binaries"))
 
     local matches = slot.hash_stored ~= nil and slot.hash_stored == actual

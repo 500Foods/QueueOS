@@ -15,7 +15,7 @@ Hydrogen splits its build the same way, one file per concern. QueueOS starts wit
 | `CMakeLists.txt` | Includes the other lists. The root file calls `project()`. Configuring `cmake/` by itself is refused. |
 | `CMakeLists-version.cmake` | `major.minor.build`. The build count is `git rev-list --count HEAD`. |
 | `CMakeLists-init.cmake` | Host C defaults and CTest. |
-| `CMakeLists-host.cmake` | Host test `sentences`, plus the `pe-reloc` and `mkimage` tools. |
+| `CMakeLists-host.cmake` | Host tests `sentences` and `publisher`, plus the `pe-reloc`, `mkimage`, `publisher`, and `db-image` tools. |
 | `CMakeLists-efi.cmake` | Freestanding x86-64 Boot, Base, and BootFail stubs, plus the `efi-headers` check. |
 | `CMakeLists-image.cmake` | `images` target and the `image-a001` check. |
 | `CMakeLists-harness.cmake` | `test-first`, `test-second`, `test-case`, and `run`. |

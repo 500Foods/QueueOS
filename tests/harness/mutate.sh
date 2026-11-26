@@ -1,5 +1,7 @@
-# Work-copy ESP mutations. Sourced by run.sh.
-# images/ is not opened for writing. The database copy is not touched.
+# Work-copy mutations. Sourced by run.sh.
+# images/ is not opened for writing. The database work copy is touched
+# only by corrupt-base-bytes. That flips one byte at the start of the
+# boot range, which is where the stub image stores Base.
 # losetup, qemu-nbd, and kpartx need privileges, so they are not the path.
 # mtools uses the same @@1M offset as mkimage, and only after the first
 # GPT partition is shown to start at 1 MiB. A different start fails the
@@ -69,6 +71,37 @@ apply_mutation() {
                 echo "could not delete EFI/QueueOS/current/Base.efi" >&2
                 return 1
             fi
+            ;;
+        corrupt-base-bytes)
+            db_image=$GUEST_DIR/work/QueueOS-Database.qcow2
+            db_raw=$GUEST_DIR/work/database.raw
+            db_next=$GUEST_DIR/work/database-mutated.qcow2
+            db_off=$((10 * 4096))
+            if [[ ! -f $db_image ]]; then
+                echo "work database image is missing" >&2
+                return 1
+            fi
+            if ! qemu-img convert -O raw -- "$db_image" "$db_raw"; then
+                echo "could not read the work database image" >&2
+                return 1
+            fi
+            db_size=$(stat -c '%s' "$db_raw")
+            if (( db_size <= db_off )); then
+                echo "work database image has no boot range" >&2
+                return 1
+            fi
+            db_old=$(od -An -tu1 -N1 -j "$db_off" -- "$db_raw" | tr -d '[:space:]')
+            db_new=$(( (db_old + 1) % 256 ))
+            printf '%b' "\\$(printf '%03o' "$db_new")" | dd of="$db_raw" bs=1 seek="$db_off" conv=notrunc status=none
+            if ! qemu-img convert -O qcow2 -- "$db_raw" "$db_next"; then
+                echo "could not write the mutated database image" >&2
+                return 1
+            fi
+            if ! mv -f -- "$db_next" "$db_image"; then
+                echo "could not replace the work database image" >&2
+                return 1
+            fi
+            rm -f -- "$db_raw"
             ;;
         replace-boot-fail)
             if [[ ! -f $BUILD/efi/BootFail.efi ]]; then

@@ -10,7 +10,7 @@
  * disk does not have enough 4 KiB clusters for FAT32, and the image is
  * specified to be FAT32.
  *
- * usage: mkimage --root DIR --build DIR
+ * usage: mkimage --root DIR --build DIR --database-raw FILE
  *
  * A boot folder may include vm.conf. That names a local guest copy
  * to refresh after the images are written. Folders without the file
@@ -551,11 +551,12 @@ static void clear_fat_times(const char *raw_path)
     free(data);
 }
 
-static void ensure_database(const char *db_dir)
+/* raw_path is the database disk db-image already filled. This function
+ * only wraps qcow2. It does not know the slot format. */
+static void ensure_database(const char *db_dir, const char *raw_path)
 {
     char image[QPATH];
     char manifest[QPATH];
-    char bytes[32];
     char digest[65];
     struct stat st;
     FILE *fp;
@@ -570,13 +571,12 @@ static void ensure_database(const char *db_dir)
     } else if (errno != ENOENT) {
         die_errno(image);
     }
-    snprintf(bytes, sizeof bytes, "%d", DISK_BYTES);
     argv[0] = "qemu-img";
-    argv[1] = "create";
-    argv[2] = "-f";
+    argv[1] = "convert";
+    argv[2] = "-O";
     argv[3] = "qcow2";
-    argv[4] = image;
-    argv[5] = bytes;
+    argv[4] = (char *)raw_path;
+    argv[5] = image;
     argv[6] = NULL;
     run_cmd(argv);
     hash_file(image, digest);
@@ -919,6 +919,7 @@ int main(int argc, char **argv)
 {
     const char *root = NULL;
     const char *build = NULL;
+    const char *database_raw = NULL;
     char images[QPATH];
     char current_path[QPATH];
     char version[128];
@@ -939,11 +940,13 @@ int main(int argc, char **argv)
             root = argv[++arg];
         else if (strcmp(argv[arg], "--build") == 0 && arg + 1 < argc)
             build = argv[++arg];
+        else if (strcmp(argv[arg], "--database-raw") == 0 && arg + 1 < argc)
+            database_raw = argv[++arg];
         else
-            die("usage: mkimage --root DIR --build DIR");
+            die("usage: mkimage --root DIR --build DIR --database-raw FILE");
     }
-    if (!root || !build)
-        die("usage: mkimage --root DIR --build DIR");
+    if (!root || !build || !database_raw)
+        die("usage: mkimage --root DIR --build DIR --database-raw FILE");
 
     path_join(images, sizeof images, root, "images");
     path_join(current_path, sizeof current_path, images, "database/current");
@@ -952,7 +955,7 @@ int main(int argc, char **argv)
     {
         char version_dir[QPATH];
         path_join(version_dir, sizeof version_dir, db_dir, version);
-        ensure_database(version_dir);
+        ensure_database(version_dir, database_raw);
     }
 
     path_join(boot_efi, sizeof boot_efi, build, "efi/Boot.efi");

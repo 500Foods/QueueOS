@@ -1,16 +1,22 @@
 /* QueueOS-Base stub.
  *
- * After the loaded sentence, count down from 10 so a person running the
- * run target can see this stage. The sentence is already on the serial
- * line before the first count. The harness quits QEMU once the line it
- * is waiting for has arrived, so it does not sit through the countdown.
+ * The Loaded sentence is drawn first. The completion line is written
+ * next, for the slot named in the load options. The serial sentence
+ * comes after that write. The harness quits QEMU once the line it is
+ * waiting for has arrived, so the write has to be finished before the
+ * line is printed. A failed write still prints the sentence.
+ *
+ * Then count down from 10 so a person running the run target can see
+ * this stage. The harness does not sit through the countdown.
  *
  * The countdown ends by leaving the console attribute red on red. The
  * Loaded sentence stays as it was drawn. Firmware lines that reuse the
  * attribute then match the field.
  */
 
+#include "completion.h"
 #include "diagnostics.h"
+#include "pool.h"
 #include "serial.h"
 #include "text.h"
 #include "types.h"
@@ -61,9 +67,12 @@ static void queueos_base_countdown(QUEUEOS_EFI_SYSTEM_TABLE *system)
 
 QUEUEOS_EFI_STATUS QUEUEOS_EFIAPI efi_main(void *image, QUEUEOS_EFI_SYSTEM_TABLE *system)
 {
-    (void)image;
-    queueos_report(system, "QueueOS-Base: entry", QUEUEOS_BASE_SENTENCE);
+    queueos_pool_bind(system);
     queueos_serial_init();
+    queueos_serial_write_line("QueueOS-Base: entry");
+    queueos_screen_show(system, QUEUEOS_BASE_SENTENCE);
+    queueos_base_complete(system, image);
+    queueos_serial_write_line(QUEUEOS_BASE_SENTENCE);
     queueos_serial_write_line("QueueOS-Base: ready");
     queueos_base_countdown(system);
     queueos_screen_attribute(system, QUEUEOS_TEXT_RED_ON_RED);

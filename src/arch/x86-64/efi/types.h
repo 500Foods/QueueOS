@@ -113,6 +113,20 @@ typedef struct QUEUEOS_EFI_BOOT_SERVICES {
     void *exit_boot_services;
     void *get_next_monotonic_count;
     QUEUEOS_EFI_STATUS (QUEUEOS_EFIAPI *stall)(QUEUEOS_UINTN microseconds);
+    void *set_watchdog_timer;
+    void *connect_controller;
+    void *disconnect_controller;
+    void *open_protocol;
+    void *close_protocol;
+    void *open_protocol_information;
+    void *protocols_per_handle;
+    /* ByProtocol is 2. The handle buffer is firmware pool memory. */
+    QUEUEOS_EFI_STATUS (QUEUEOS_EFIAPI *locate_handle_buffer)(
+        uint32_t search_type,
+        const uint8_t *protocol,
+        void *search_key,
+        QUEUEOS_UINTN *no_handles,
+        void ***buffer);
 } QUEUEOS_EFI_BOOT_SERVICES;
 
 typedef struct QUEUEOS_EFI_SYSTEM_TABLE {

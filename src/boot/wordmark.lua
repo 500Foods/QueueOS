@@ -1,8 +1,8 @@
 -- wordmark.lua
 --
--- The Boot mark. Q and OS are solid blocks. ueue is the lighter shade.
--- The frame is the sharp box the text console can draw. A later firmware
--- Boot uses the same picture; this file only holds the lines.
+-- The Boot mark. Q and OS are solid blocks. ueue is the lighter shade,
+-- drawn white. The border is solid spaces, the same field as the inside.
+-- A later firmware Boot uses the same picture; this file only holds the lines.
 
 local Mark = {}
 
@@ -29,6 +29,23 @@ local SHADE = utf8.codepoint("▒")
 
 local function columns(line)
     return utf8.len(line) or 0
+end
+
+-- The picture is stored with a box. The screen draws solid spaces there.
+local function solid_border(line)
+    local out = {}
+    for _, cp in utf8.codes(line) do
+        if cp == SOLID or cp == SHADE then
+            out[#out + 1] = utf8.char(cp)
+        else
+            out[#out + 1] = " "
+        end
+    end
+    return table.concat(out)
+end
+
+for i = 1, #Mark.lines do
+    Mark.lines[i] = solid_border(Mark.lines[i])
 end
 
 Mark.height = #Mark.lines

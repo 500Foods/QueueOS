@@ -168,8 +168,8 @@ run_one() {
         tool-presence) host_only host_tool_presence ;;
         build-products) host_only host_build_products ;;
         unity) host_only host_unity ;;
-        image-checksum|image-database-blank|image-esp|image-payloads|image-base-size)
-            host_only bash "$ROOT/tests/host/check-images.sh" --root "$ROOT" --check "$check"
+        image-checksum|image-database|image-esp|image-payloads|image-base-size)
+            host_only bash "$ROOT/tests/host/check-images.sh" --root "$ROOT" --build "$BUILD" --check "$check"
             ;;
         image-pc-same)
             host_only host_pc_same

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # A-001 checks for images/a-001-q35-base. No QEMU.
-# usage: check-images.sh --root DIR [--check NAME]
+# usage: check-images.sh --root DIR --build DIR [--check NAME]
 # NAME selects one A-001 check. The default runs all five.
 
 set -euo pipefail
@@ -12,6 +12,7 @@ source "$script_dir/pe-read.sh"
 DISK_BYTES=$((64 * 1024 * 1024))
 ESP_TYPE=28732ac11ff8d211ba4b00a0c93ec93b
 ROOT=
+BUILD=
 CHECK=all
 
 die() {
@@ -20,7 +21,7 @@ die() {
 }
 
 usage() {
-    die "usage: check-images.sh --root DIR [--check NAME]"
+    die "usage: check-images.sh --root DIR --build DIR [--check NAME]"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -28,6 +29,11 @@ while [[ $# -gt 0 ]]; do
         --root)
             [[ $# -ge 2 ]] || usage
             ROOT=$2
+            shift 2
+            ;;
+        --build)
+            [[ $# -ge 2 ]] || usage
+            BUILD=$2
             shift 2
             ;;
         --check)
@@ -40,7 +46,7 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
-[[ -n $ROOT ]] || usage
+[[ -n $ROOT && -n $BUILD ]] || usage
 
 conf_get() {
     local key=$1 file=$2 line trimmed k v
@@ -119,13 +125,12 @@ check_database() {
     raw=$TMP/db.raw
     qemu-img convert -O raw "$database" "$raw"
     [[ $(stat -c '%s' "$raw") -eq $DISK_BYTES ]] || die "converted database is not 64 MiB"
-    # /dev/zero does not end, so the compare is capped at 8 KiB.
-    if ! cmp -s -n 8192 "$raw" /dev/zero; then
-        die "database first 8 KiB is not blank"
-    fi
     [[ $(hex_at "$raw" 510 2) != 55aa ]] || die "database has an MBR signature"
     [[ $(hex_at "$raw" 512 8) != 4546492050415254 ]] || die "database has a GPT signature"
-    echo "image-database-blank ok"
+    [[ -x $BUILD/db-image ]] || die "db-image is missing"
+    [[ -f $BUILD/efi/Base.efi ]] || die "Base.efi is missing"
+    "$BUILD/db-image" --check "$raw" "$BUILD/efi/Base.efi"
+    echo "image-database ok"
 }
 
 check_esp() {
@@ -226,7 +231,7 @@ case $CHECK in
         check_payloads "$TMP/tree"
         check_base_size "$TMP/tree"
         ;;
-    image-database-blank)
+    image-database)
         check_database "$folder" "$database"
         ;;
     image-esp)

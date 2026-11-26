@@ -7,3 +7,5 @@ A folder appears when the code is actually imported. Empty slots for possible fu
 QueueOS code does not go here. Host tests stay in `tests/`. Operating-system sources stay in `src/`. Firmware installed on the development machine, and Lua modules installed with luarocks, stay outside the tree.
 
 Do not edit files inside an upstream folder. A local change belongs in our code, or in a note next to the import that says why the upstream file could not be used as released.
+
+Lua 5.5.1 is `vendored/lua/`. The license text is `doc/readme.html`, which the upstream README names. `lua.c` and `luac.c` are the host programs and are not compiled. Jansson 2.15.1 is `vendored/jansson/`. `dtoa.c` is not compiled.
