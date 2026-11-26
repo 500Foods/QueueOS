@@ -67,30 +67,37 @@ While this project is currently under active development, feel free to give it a
 [![Count Lines of Code](https://github.com/500Foods/QueueOS/actions/workflows/main.yml/badge.svg)](https://github.com/500Foods/QueueOS/actions/workflows/main.yml)
 <!--CLOC-START -->
 ```cloc
-Last updated at 2026-11-25 13:24:10 UTC
+Last updated at 2026-11-26 01:36:50 UTC
 -------------------------------------------------------------------------------
 Language                     files          blank        comment           code
 -------------------------------------------------------------------------------
-Markdown                        25           2816              2           5181
-C                               11            485            357           4255
-Lua                              8            198            145           2499
-C/C++ Header                     7            255            280           1756
-Bourne Shell                     7             78             61           1034
-CMake                            8             37             46            194
+C                               80           5816           5455          37953
+C/C++ Header                    57           1946           2392           5419
+Markdown                        25           2849              2           5214
+Lua                              9            226            196           3922
+Bourne Shell                     7             78             62           1071
+CMake                            8             49             65            400
+HTML                             1             36              3            295
+make                             1             46             12            174
+reStructuredText                 1             26              6             38
 YAML                             2              8             13             37
 Text                             1              4              0             17
 -------------------------------------------------------------------------------
-SUM:                            69           3881            904          14973
+SUM:                           192          11084           8206          54540
 -------------------------------------------------------------------------------
-39 Files were skipped (duplicate, binary, or without source code):
+45 Files were skipped (duplicate, binary, or without source code):
   conf: 28
   sha256: 4
+  version: 3
   list: 2
+  changes: 1
   current: 1
   gitattributes: 1
   gitignore: 1
+  in: 1
   lds: 1
-  version: 1
+  license: 1
+  readme: 1
 ```
 <!--CLOC-END-->
 
